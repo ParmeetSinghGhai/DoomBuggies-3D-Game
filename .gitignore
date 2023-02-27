@@ -30,3 +30,5 @@
 *.exe
 *.out
 *.app
+.vs/DoomBuggies/v17/.suo
+.vs/DoomBuggies/v17/Browse.VC.db
