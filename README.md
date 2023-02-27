@@ -21,7 +21,7 @@ The more time you take to destroy the enemies, the faster they will get so hurry
 - Every now and then health package and weapon package will appear on the floor. you can left click on one of your buggies and then left click on the health or weapon package to acquire it. 
 
 ## License ##
-You can only use the code for personal use. Commercial use or distribution of the code or any other besides personal use is prohibited. 
+You can only use the code for personal use. Commercial use or distribution of the code or any other use besides personal use is prohibited. 
 
 ## ScreenShots ##
 ![Explosion](https://parmeetsinghghai.github.io/doombuggies/buggy1.png)
