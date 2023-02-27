@@ -13,8 +13,11 @@ bool GameWindow::WindowHasMoved;
 bool GameWindow::ViewPortChanged=true;
 bool GameWindow::HasFocus;
 bool GameWindow::CameraHasMouse;
+bool GameWindow::KeyPressed;
+char GameWindow::KeyCode;
 bool GameWindow::MouseLButtonPressed;
 bool GameWindow::MouseRButtonPressed;
+bool GameWindow::MouseMButtonPressed;
 DWORD GameWindow::MouseTimer;
 HWND GameWindow::WindowHandle;
 HDC GameWindow::DeviceContext;
@@ -78,11 +81,23 @@ LRESULT CALLBACK GameWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
         HasFocus=false;
         break;
     case WM_SIZE:
-	{
+	    {
             WindowHasResized=true;
-	    PostMessageW(hWnd, WM_USER + 1, wParam, lParam);
-	}
-	break;
+	        PostMessageW(hWnd, WM_USER + 1, wParam, lParam);
+	    }
+	    break;
+    case WM_KEYDOWN:
+        {
+            KeyPressed = true;
+            KeyCode = (char)wParam;
+        }
+        break;
+    case WM_KEYUP:
+        {
+            KeyPressed = false;
+            KeyCode = '/0';
+        }
+        break;
   	case WM_MOVE:
         {
             WindowHasMoved=true;
@@ -107,6 +122,12 @@ LRESULT CALLBACK GameWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
     case WM_RBUTTONUP:
         MouseRButtonPressed=false;
         break;
+    case WM_MBUTTONDOWN:
+        MouseMButtonPressed = true;
+        break;
+    case WM_MBUTTONUP:
+        MouseMButtonPressed = false;
+        break;
     case WM_USER + 1:
         {
         RECT rc;
@@ -117,12 +138,12 @@ LRESULT CALLBACK GameWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
         ClientToScreen(WindowHandle, &pt2);
         SetRect(&rc, pt.x, pt.y, pt2.x, pt2.y);
         Width = rc.right - rc.left;
-	Height = rc.bottom - rc.top;
+	    Height = rc.bottom - rc.top;
         X = rc.left;
-	Y = rc.top;
+	    Y = rc.top;
         glViewport(0,0,Width,Height);
         ViewPortChanged=true;
-	break;
+	    break;
         }
     case WM_CLOSE:
     case WM_DESTROY:

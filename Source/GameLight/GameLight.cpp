@@ -1,5 +1,11 @@
 #include <GameLight/GameLight.h>
-int GameLight::TotalLights=0;
+#include <GameSettings/GameSettings.h>
+int GameLight::LightData_Binding = 4;
+unsigned int GameLight::LightData_SSBO;
+bool GameLight::ALL_Lights_Loaded = false;
+std::vector<SunLight*> GameLight::SunLights;
+std::vector<PointLight*> GameLight::PointLights;
+std::vector<SpotLight*> GameLight::SpotLights;
 /*************************************************
 LIGHTS SOURCES USED IN 3D ENVIRONMENT ARE GENERALY OF 3 TYPES
 1) DIRECTIONAL LIGHTS
@@ -146,7 +152,7 @@ FINAL COLOR=((INTENSITY * ATTENUATION * AMBIENT COLOR) + (INTENSITY * ATTENUATIO
 //******************************
 FOR MULTPLE LIGHT SOURCES THE "FINAL COLOR" VALUE FROM ALL OF THEM IS ADDED TOGETHER TO YIELD THE FINAL COLOR OF THE OBJECT
 *************************************************/
-void GameLight::GetDistanceValues(int Distance,float *Lin,float* Quad)
+void GetDistanceValues(int Distance,float *Lin,float* Quad)
 {
 float Linear;
 float Quadratic;
@@ -221,69 +227,89 @@ Quadratic=0.032;
 *Quad=Quadratic;
 }
 
-
 //*******************************************
 // SUN LIGHT / DIRECTIONAL LIGHT FUNCTIONS
 //*******************************************
-void GameLight::SunLight::UpdateColor(GameMath::Vector3 Color)
+SunLight::SunLight()
+{
+    std::cout << "SUNLIGHT GOT CREATED\n";
+}
+
+SunLight::~SunLight()
+{
+    std::cout << "SUNLIGHT GOT DESTROYED\n";
+}
+
+void SunLight::UpdateColor(GameMath::Vector3 Color)
 {
 float data[4]={Color.x,Color.y,Color.z,0.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 8), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::SunLight::UpdateDirection(GameMath::Vector3 Direction)
+void SunLight::UpdateDirection(GameMath::Vector3 Direction)
 {
 float data[4]={Direction.x,Direction.y,Direction.z,0.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 16), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
+
 //*******************************************
 // POINT LIGHT FUNCTIONS
 //*******************************************
-void GameLight::PointLight::SetupDistance(int Distance)
+PointLight::PointLight()
+{
+    std::cout << "POINTLIGHT GOT CREATED\n";
+}
+
+PointLight::~PointLight()
+{
+    std::cout << "POINTLIGHT GOT DESTROYED\n";
+}
+
+void PointLight::SetupDistance(int Distance)
 {
 GetDistanceValues(Distance,&this->Linear,&this->Quadratic);
 }
 
-void GameLight::PointLight::UpdateColorXYZ(float x,float y,float z)
+void PointLight::UpdateColorXYZ(float x,float y,float z)
 {
 float data[4]={x,y,z,0.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 8), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::PointLight::UpdateColor(GameMath::Vector3 Color)
+void PointLight::UpdateColor(GameMath::Vector3 Color)
 {
 float data[4]={Color.x,Color.y,Color.z,0.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 8), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::PointLight::UpdatePosition(GameMath::Vector3 Position)
+void PointLight::UpdatePosition(GameMath::Vector3 Position)
 {
 float data[4]={Position.x,Position.y,Position.z,1.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 12), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::PointLight::UpdateDistance(int Distance)
+void PointLight::UpdateDistance(int Distance)
 {
 float Linear;
 float Quadratic;
 GetDistanceValues(Distance,&Linear,&Quadratic);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,7,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 2), 1 *  sizeof(float), &Linear);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 3), 1 *  sizeof(float), &Quadratic);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -291,69 +317,83 @@ glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 //*******************************************
 // SPOT LIGHT FUNCTIONS
 //*******************************************
-void GameLight::SpotLight::SetupDistance(int Distance)
+SpotLight::SpotLight()
+{
+    std::cout << "SPOTLIGHT GOT CREATED\n";
+}
+
+SpotLight::~SpotLight()
+{
+    std::cout << "SPOTLIGHT GOT DESTROYED\n";
+}
+
+void SpotLight::SetupDistance(int Distance)
 {
 GetDistanceValues(Distance,&this->Linear,&this->Quadratic);
 }
 
-void GameLight::SpotLight::UpdateDirection(GameMath::Vector3 Direction)
+void SpotLight::UpdateDirection(GameMath::Vector3 Direction)
 {
 float data[4]={Direction.x,Direction.y,Direction.z,0.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 16), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::SpotLight::UpdateColor(GameMath::Vector3 Color)
+void SpotLight::UpdateColor(GameMath::Vector3 Color)
 {
 float data[4]={Color.x,Color.y,Color.z,0.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 8), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::SpotLight::UpdatePosition(GameMath::Vector3 Position)
+void SpotLight::UpdatePosition(GameMath::Vector3 Position)
 {
 float data[4]={Position.x,Position.y,Position.z,1.0f};
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 12), 4 *  sizeof(float), &data[0]);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::SpotLight::UpdateDistance(int Distance)
+void SpotLight::UpdateDistance(int Distance)
 {
 float Linear;
 float Quadratic;
 GetDistanceValues(Distance,&Linear,&Quadratic);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 2), 1 *  sizeof(float), &Linear);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 3), 1 *  sizeof(float), &Quadratic);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::SpotLight::UpdateCutOffAngle(float DegreeAngle)
+void SpotLight::UpdateCutOffAngle(float DegreeAngle)
 {
 float data=cos(GameMath::Transform::GetRadian(DegreeAngle));
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 4), 1 *  sizeof(float), &data);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void GameLight::SpotLight::UpdateOuterCutOffAngle(float DegreeAngle)
+void SpotLight::UpdateOuterCutOffAngle(float DegreeAngle)
 {
 float data=cos(GameMath::Transform::GetRadian(DegreeAngle));
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameLight::LightData_Binding,GameLight::LightData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,DataIndex + (sizeof(float) * 5), 1 *  sizeof(float), &data);
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
+//*******************************************
+// GAMELIGHT FUNCTIONS
+//*******************************************
 
-
-
-
+int GameLight::GetTotalLightCount()
+{
+    return GameLight::SunLights.size() + GameLight::PointLights.size() + GameLight::SpotLights.size();
+}

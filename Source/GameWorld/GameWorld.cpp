@@ -1,5 +1,20 @@
 #include<GameWorld/GameWorld.h>
 int GameWorld::Index=0;
+
+
+GameWorld::~GameWorld()
+{
+    for (std::map<int, std::map<int, GameWorldCube*>>::iterator it = WorldCoordMap.begin(); it != WorldCoordMap.end(); it++)
+    {
+        for (std::map<int, GameWorldCube*>::iterator innerit = it->second.begin(); innerit != it->second.end(); innerit++)
+            delete innerit->second;
+        it->second.clear();
+    }
+    WorldCoordMap.clear();
+    std::cout << "GAMEWORLD HAS BEEN DESTROYED\n";
+}
+
+std::map<int, std::map<int, GameWorldCube*>> WorldCoordMap;
 /*************************************************
 THE WORLD IS BASICALLY A FLAT SURFACE THAT THE GAME OBJECTS RESIDE ON. THE WORLD REPRESENTATION IS SPLIT INTO TWO WAYS:
 1) THE FOREGROUND REPRESENTATION THAT GETS RENDERED ON THE SCREEN WITH PROPER TEXTURES
@@ -162,6 +177,7 @@ for(int z=0;z<zbound;z=z+SmallestDivision)
   {
    TempCube=MakeCube(z,x,minx,minz,maxy);
    (WorldCoordMap[z])[x]=TempCube;
+   //std::cout << "Cube Created , R=" + std::to_string(TempCube->R) + ",G=" + std::to_string(TempCube->G) + ",B=" + std::to_string(TempCube->B) + "\n";
    count++;
   }
 }
@@ -254,6 +270,12 @@ Cube->ColorTint.z=0.0f;
 GameWindow::PixelMapping(Cube);
 Cube->Load(&WorldVBOBuffer,SmallestDivision);
 return Cube;
+}
+
+GameWorldCube::~GameWorldCube()
+{
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
 }
 /*************************************************
 THIS FUNCTION CREATES VERTEX DATA FOR A GAMEWORLDCUBE USING ITS CENTROID
@@ -421,15 +443,10 @@ else if(ColorSwitch==false)
     if(ColorEffect > 1.0f)
     ColorSwitch=true;
 }
+glUniformMatrix4fv(2, 1, GL_FALSE, FinalMatrix.Addressof());
 glUniform4f(6,ColorEffect + ColorTint.x,ColorEffect+ColorTint.y,ColorEffect+ColorTint.z,1.0f);
 glBindVertexArray(VAO);
 glDrawArrays(GL_TRIANGLES, 0, 36);
-}
-
-void GameWorldCube::Free()
-{
-glDeleteVertexArrays(1,&VAO);
-glDeleteBuffers(1,&VBO);
 }
 /*************************************************
 THIS FUNCTION DRAWS ALL THE GAMEWORLDCUBES WHICH ARE PART OF THE GAMEWORLD OBJECT
@@ -441,6 +458,12 @@ glUniform1i(5,0);
 glBindVertexArray(WorldVAO);
 glDrawArrays(GL_TRIANGLES,0,WorldVAOCount);
 }
+
+
+
+
+
+
 
 
 

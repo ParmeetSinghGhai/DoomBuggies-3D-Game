@@ -10,41 +10,47 @@
 
 class GameMesh
 {
-public:
-static int MaterialIndex;
+	public:
+	static int MeshIndex;
+	static int MaterialIndex;
+	int Index;
+	int ObjectIndex;
 
-struct VertexGroupData
-{
-std::vector<float> Weights;
-};
+	struct VertexGroupData
+	{
+	std::vector<float> Weights;
+	};
 
-struct MaterialData
-{
-int Index;
-float AmbientStrength;
-int ShininessIndex;
-GameMath::Vector3 DiffuseColor;
-GameMath::Vector3 SpecularColor;
-std::string DiffuseMap="";
-std::string AmbientMap="";
-std::string SpecularMap="";
-MaterialData();
-};
+	struct MaterialData
+	{
+	int Index;
+	int MeshIndex;
+	float AmbientStrength;
+	int ShininessIndex;
+	GameMath::Vector3 DiffuseColor;
+	GameMath::Vector3 SpecularColor;
+	std::string DiffuseMap="";
+	std::string AmbientMap="";
+	std::string SpecularMap="";
+	MaterialData(int MeshIndex);
+	~MaterialData();
+	};
 
-struct FaceData
-{
-int Indices[3];
-std::vector<GameMath::Vector2*> UVCoords;
-int Material_index=-1;
-};
+	struct FaceData
+	{
+	int Indices[3];
+	std::vector<GameMath::Vector2*> UVCoords;
+	int Material_index=-1;
+	};
 
-std::string Name;
-std::vector<GameMath::Vector3*> Vertices;
-std::vector<FaceData*> Faces;
-std::vector<MaterialData*> Materials;
-std::map<std::string,VertexGroupData*> VertexGroups;
-GameBoundingBox* BoundingBox;
-void ShowContent();
+	std::string Name;
+	std::vector<GameMath::Vector3*> Vertices;
+	std::vector<FaceData*> Faces;
+	std::vector<MaterialData*> Materials;
+	std::map<std::string,VertexGroupData*> VertexGroups;
+	GameBoundingBox* BoundingBox;
+	~GameMesh();
+	void ShowContent();
 };
 
 #endif//GAMEMESH_H

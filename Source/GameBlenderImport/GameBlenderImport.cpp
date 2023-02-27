@@ -174,16 +174,21 @@ std::string buffer;
 Binaryfile.open(FilePath,std::ios::in | std::ios::binary);
 if(Binaryfile.is_open())
 {
+    std::cout << "LOADING OBJECT DATA FROM LOCAL FILE :: " + FilePath + "\n";
     try
     {
 	GameObject *Gobject=new GameObject();//CREATE NEW GAME OBJECT FILE IF THE FILE OPENED UP SUCCESSFULLY
+    Gobject->Mesh.Index = GameMesh::MeshIndex++;
+    Gobject->Mesh.ObjectIndex = Gobject->Index;
+    Gobject->Armature.Index = GameArmature::ArmatureIndex++;
+    Gobject->Armature.ObjectIndex = Gobject->Index;
 	if(Geti()==1)//ARMATURE IS PRESENT SO EXTRACT ARMATURE
 	{
 	   Gobject->Armature.Name=Gets();//GET ARMATURE NAME
            int totalbones=Geti();//GET TOTAL NUMBER OF BONES
 	   for(int i=0;i<totalbones;i++)//ITERATE THROUGH ALL THE BONES
 	   {
-	     GameArmature::Bone* Gbone=new GameArmature::Bone();//CREATE A NEW BONE
+	     GameArmature::Bone* Gbone=new GameArmature::Bone(Gobject->Armature.Index);//CREATE A NEW BONE
 	     Gbone->Name=Gets();//GET BONE NAME
 	     Getv(&(Gbone->Head));//GET BONE HEAD VECTOR
 	     Getv(&(Gbone->Tail));//GET BONE TAIL VECTOR
@@ -203,99 +208,101 @@ if(Binaryfile.is_open())
 	   }
 	   Gobject->Armature.ConnectBones();//AFTER ALL BONE DATA HAS BEEN COLLECTED THEN WE NEED TO LINK THEM
 	                                    //TOGETHER AS PER THEIR PARENT AND CHILD RELATIONSHIP USING THEIR NAMES
-	}
+	   }
 
        //EXTRACT MESH DATA
        Gobject->Mesh.Name=Gets();//GET MESH NAME
        int totalvertices=Geti();//GET TOTAL NUMBER OF VERTICES IN THE MESH
        for(int i=0;i<totalvertices;i++)//SAVES ALL VERTICES IN THE MESH'S VERTICES COLLECTION
        {
-	 vec3=new GameMath::Vector3();
-	 vec3->x=Getf();
-	 vec3->y=Getf();
-	 vec3->z=Getf();
-	 Gobject->Mesh.Vertices.push_back(vec3);
+	     vec3=new GameMath::Vector3();
+	     vec3->x=Getf();
+	     vec3->y=Getf();
+	     vec3->z=Getf();
+	     Gobject->Mesh.Vertices.push_back(vec3);
        }
 
        float maxx,minx,maxy,miny,maxz,minz;
        Getbb(&maxx,&minx,&maxy,&miny,&maxz,&minz);
-       boundingbox=new GameBoundingBox(maxx,minx,maxy,miny,maxz,minz);//GET BOUNDING BOX'S DATA
+       boundingbox=new GameBoundingBox(maxx,minx,maxy,miny,maxz,minz,Gobject->Index);//GET BOUNDING BOX'S DATA
        Gobject->Mesh.BoundingBox=boundingbox;//SAVE MESH'S BOUNDING BOX'S DATA
+       Gobject->BoundingBox = boundingbox;//SAVE BOUNDING BOX'S REFERENCE IN THE OBJECT AS WELL
+       Gobject->BoundingBox->Object = Gobject;
 
        int totalfaces=Geti();//GET TOTAL NUMBER OF TRIANGLES PRESENT
        int uvpresentflag=Geti();//GET THE UV PRESENT FLAG, IF SET T0 0 THEN UV COORDINATES ARE NOT PRESENT ELSE THEY ARE PRESENT
        if(uvpresentflag==1)//UV COORDINATES ARE PRESENT SO EXTRACT VERTEX COORDINATES AND UV COORDINATES
        {
-	   for(int i=0;i<totalfaces;i++)
-	   {
-	     face=new GameMesh::FaceData();
-	     face->Material_index=Geti();
-	     face->Indices[0]=Geti();
-	     face->Indices[1]=Geti();
-	     face->Indices[2]=Geti();
+	       for(int i=0;i<totalfaces;i++)
+	       {
+	         face=new GameMesh::FaceData();
+	         face->Material_index=Geti();
+	         face->Indices[0]=Geti();
+	         face->Indices[1]=Geti();
+	         face->Indices[2]=Geti();
 
-	     for(int j=0;j<3;j++)
-	     {
-		 vec2=new GameMath::Vector2();
-		 vec2->x=Getf();
-		 vec2->y=Getf();
-		 face->UVCoords.push_back(vec2);
-	     }
-	     Gobject->Mesh.Faces.push_back(face);
-	   }
+	         for(int j=0;j<3;j++)
+	         {
+		     vec2=new GameMath::Vector2();
+		     vec2->x=Getf();
+		     vec2->y=Getf();
+		     face->UVCoords.push_back(vec2);
+	         }
+	         Gobject->Mesh.Faces.push_back(face);
+	       }
        }
        else//UV COORDINATES ARE NOT PRESENT SO DO NOT EXTRACT UV COORDINATES.ONLY EXTRACT VERTEX COORDINATES
        {
-	   for(int i=0;i<totalfaces;i++)
-	   {
-	     face=new GameMesh::FaceData();
-	     face->Material_index=Geti();
-	     face->Indices[0]=Geti();
-	     face->Indices[1]=Geti();
-	     face->Indices[2]=Geti();
-	     Gobject->Mesh.Faces.push_back(face);
-	   }
+	       for(int i=0;i<totalfaces;i++)
+	       {
+	         face=new GameMesh::FaceData();
+	         face->Material_index=Geti();
+	         face->Indices[0]=Geti();
+	         face->Indices[1]=Geti();
+	         face->Indices[2]=Geti();
+	         Gobject->Mesh.Faces.push_back(face);
+	       }
        }
 
        int totalmaterial=Geti();//GET TOTAL NUMBER OF MATERIALS
        for(int i=0;i<totalmaterial;i++)//ITERATE THROUGH ALL THE MATERIALS
        {
-	 material=new GameMesh::MaterialData();//CREATE A NEW MATERIAL OBJECT
-	 material->AmbientStrength=Getf();//GET MATERIAL AMBIENT STRENGTH
-	 material->ShininessIndex=Getf();//GET MATERIAL SHININESS INDEX
-	 material->DiffuseColor.x=Getf();//GET MATERIAL DIFFUSE COLOR X COMPONENT
-	 material->DiffuseColor.y=Getf();//GET MATERIAL DIFFUSE COLOR Y COMPONENT
-	 material->DiffuseColor.z=Getf();//GET MATERIAL DIFFUSE COLOR Z COMPONENT
-	 material->SpecularColor.x=Getf();//GET MATERIAL SPECULAR COLOR X COMPONENT
-	 material->SpecularColor.y=Getf();//GET MATERIAL SPECULAR COLOR Y COMPONENT
-	 material->SpecularColor.z=Getf();//GET MATERIAL SPECULAR COLOR Z COMPONENT
-	 if(Gets()!="")//IF THE NAME OF THE DIFFUSE MAP IS PRESENT THEN SET THE NAME TO "MESHNAME + DIFFUSEMAP.BMP"
-	 material->DiffuseMap=GameWindow::CWD+"\\Payload\\Textures\\"+Gobject->Mesh.Name+"DiffuseMap.bmp";
-	 else
-	 material->DiffuseMap="";
-	 if(Gets()!="")//IF THE NAME OF THE AMBIENT MAP IS PRESENT THEN SET THE NAME TO "MESHNAME + AMBIENTMAP.BMP"
-	 material->AmbientMap=GameWindow::CWD+"\\Payload\\Textures\\"+Gobject->Mesh.Name+"AmbientMap.bmp";
-	 else
-	 material->AmbientMap="";
-	 if(Gets()!="")//IF THE NAME OF THE SPECULAR MAP IS PRESENT THEN SET THE NAME TO "MESHNAME + SPECULARMAP.BMP"
-	 material->SpecularMap=GameWindow::CWD+"\\Payload\\Textures\\"+Gobject->Mesh.Name+"SpecularMap.bmp";
-	 else
-	 material->SpecularMap="";
-	 Gobject->Mesh.Materials.push_back(material);//SAVE THE MATERIAL IN MESH'S MATERIAL COLLECTION
+	     material=new GameMesh::MaterialData(Gobject->Mesh.Index);//CREATE A NEW MATERIAL OBJECT
+	     material->AmbientStrength=Getf();//GET MATERIAL AMBIENT STRENGTH
+	     material->ShininessIndex=Getf();//GET MATERIAL SHININESS INDEX
+	     material->DiffuseColor.x=Getf();//GET MATERIAL DIFFUSE COLOR X COMPONENT
+	     material->DiffuseColor.y=Getf();//GET MATERIAL DIFFUSE COLOR Y COMPONENT
+	     material->DiffuseColor.z=Getf();//GET MATERIAL DIFFUSE COLOR Z COMPONENT
+	     material->SpecularColor.x=Getf();//GET MATERIAL SPECULAR COLOR X COMPONENT
+	     material->SpecularColor.y=Getf();//GET MATERIAL SPECULAR COLOR Y COMPONENT
+	     material->SpecularColor.z=Getf();//GET MATERIAL SPECULAR COLOR Z COMPONENT
+	     if(Gets()!="")//IF THE NAME OF THE DIFFUSE MAP IS PRESENT THEN SET THE NAME TO "MESHNAME + DIFFUSEMAP.BMP"
+	     material->DiffuseMap=GameWindow::CWD+"\\Payload\\Textures\\"+Gobject->Mesh.Name+"DiffuseMap.bmp";
+	     else
+	     material->DiffuseMap="";
+	     if(Gets()!="")//IF THE NAME OF THE AMBIENT MAP IS PRESENT THEN SET THE NAME TO "MESHNAME + AMBIENTMAP.BMP"
+	     material->AmbientMap=GameWindow::CWD+"\\Payload\\Textures\\"+Gobject->Mesh.Name+"AmbientMap.bmp";
+	     else
+	     material->AmbientMap="";
+	     if(Gets()!="")//IF THE NAME OF THE SPECULAR MAP IS PRESENT THEN SET THE NAME TO "MESHNAME + SPECULARMAP.BMP"
+	     material->SpecularMap=GameWindow::CWD+"\\Payload\\Textures\\"+Gobject->Mesh.Name+"SpecularMap.bmp";
+	     else
+	     material->SpecularMap="";
+	     Gobject->Mesh.Materials.push_back(material);//SAVE THE MATERIAL IN MESH'S MATERIAL COLLECTION
        }
 
        int totalvertexgroups=Geti();//GET TOTAL NUMBER OF VERTEX GROUPS
        for(int i=0;i<totalvertexgroups;i++)//ITERATE THROUGH ALL THE VERTEX GROUPS
        {
-	 vertexgroup=new GameMesh::VertexGroupData();//CREATE A NEW VERTEX GROUP OBJECT
-	 buffer=Gets();//GET NAME OF THE VERTEX GROUP
-	 for(int q=0;q<totalvertices;q++)//ITERATE THROOUGH ALL THE VERTICES OF THE MESH TO MAP ALL THEIR WEIGHTS FOR THIS VERTEX GROUP
-	 vertexgroup->Weights.push_back(Getf());
-	 Gobject->Mesh.VertexGroups[buffer]=vertexgroup;//SAVE THE VERTEX GROUP IN THE MESH'S VERTEX GROUP COLLECTION
+	     vertexgroup=new GameMesh::VertexGroupData();//CREATE A NEW VERTEX GROUP OBJECT
+	     buffer=Gets();//GET NAME OF THE VERTEX GROUP
+	     for(int q=0;q<totalvertices;q++)//ITERATE THROOUGH ALL THE VERTICES OF THE MESH TO MAP ALL THEIR WEIGHTS FOR THIS VERTEX GROUP
+	     vertexgroup->Weights.push_back(Getf());
+	     Gobject->Mesh.VertexGroups[buffer]=vertexgroup;//SAVE THE VERTEX GROUP IN THE MESH'S VERTEX GROUP COLLECTION
        }
 
        Gobject->FilePath=filepath.substr(0, filepath.find_last_of("\\/"));//SAVE THE FILE PATH
-       std::cout<<"Object "<<Gobject->Mesh.Name<<" imported successfully\n";
+       std::cout<<"OBJECT "<<Gobject->Mesh.Name<<" IMPORTED SUCCESSFULLY\n";
        fflush(NULL);
        Binaryfile.close();
        return Gobject;//RETURN THE NEWLY CREATED GAME OBJECT

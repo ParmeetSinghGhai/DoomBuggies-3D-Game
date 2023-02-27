@@ -1,10 +1,80 @@
 #include <GameEffects/GameEffects.h>
+int GameEffects::Bullet::BulletIndex = 0;
+int GameEffects::BulletFire::BulletFireIndex = 0;
+int GameEffects::Explosion::ExplosionIndex = 0;
+//CONSTRUCTORS
+GameEffects::Bullet::Bullet(int ObjectIndex)
+{
+    Index = BulletIndex++;
+    this->ObjectIndex = ObjectIndex;
+}
+GameEffects::BulletFire::BulletFire(int ObjectIndex)
+{
+    Index = BulletFireIndex++;
+    this->ObjectIndex = ObjectIndex;
+}
+GameEffects::Explosion::Explosion(int ObjectIndex)
+{
+    Index = ExplosionIndex++;
+    this->ObjectIndex = ObjectIndex;
+}
+//DESTRUCTORS
+GameEffects::Bullet::~Bullet()
+{
+    if (Vertices != nullptr)
+        delete Vertices;
+    if (VAO >= 0)
+        glDeleteVertexArrays(1,&VAO);
+    if (VBO >= 0)
+        glDeleteBuffers(1, &VBO);
+    if (Texture >= 0)
+        glDeleteTextures(1, &Texture);
+    std::cout << "BULLET #"<<std::to_string(BulletIndex)<<" FROM OBJECT #"<<std::to_string(ObjectIndex)<<" GOT DESTROYED\n";
+}
+GameEffects::BulletFire::~BulletFire()
+{
+    if (Vertices != nullptr)
+        delete Vertices;
+    if (VAO > 0)
+        glDeleteVertexArrays(1, &VAO);
+    if (VBO >= 0)
+        glDeleteBuffers(1, &VBO);
+    if (Texture > 0)
+        glDeleteTextures(1, &Texture);
+    std::cout << "BULLETFIRE #" << std::to_string(BulletFireIndex) << " FROM OBJECT #" << std::to_string(ObjectIndex) << " GOT DESTROYED\n";
+}
+GameEffects::Explosion::~Explosion()
+{
+    if (Vertices != nullptr)
+        delete Vertices;
+    if (VAO > 0)
+        glDeleteVertexArrays(1, &VAO);
+    if (VBO >= 0)
+        glDeleteBuffers(1, &VBO);
+    if (Texture > 0)
+        glDeleteTextures(1, &Texture);
+    std::cout << "EXPLOSION #" << std::to_string(ExplosionIndex) << " FROM OBJECT #" << std::to_string(ObjectIndex) << " GOT DESTROYED\n";
+}
+GameEffects::HelpSection::~HelpSection()
+{
+    if (Vertices != nullptr)
+        delete Vertices;
+    if (VAO > 0)
+        glDeleteVertexArrays(1, &VAO);
+    if (VBO >= 0)
+        glDeleteBuffers(1, &VBO);
+    for (int i = 0; i < 9; i++)
+    {
+        if(Texture[i] > 0)
+            glDeleteTextures(1, &Texture[i]);
+    }
+    std::cout << "HELPSECTION GOT DESTROYED\n";
+}
 /*************************************************
 THIS FUNCTION LOADS THE BULLER MESH DATA AND TEXTURE DATA IN GPU MEMORY USING THE HELPER SHADER
 *************************************************/
 void GameEffects::Bullet::Load()
 {
-unsigned int VBO;
 glGenVertexArrays(1, &VAO);
 glGenBuffers(1, &VBO);
 glBindVertexArray(VAO);
@@ -40,7 +110,6 @@ THIS FUNCTION LOADS THE BULLER FIRE MESH DATA AND TEXTURE DATA IN GPU MEMORY USI
 *************************************************/
 void GameEffects::BulletFire::Load()
 {
-unsigned int VBO;
 glGenVertexArrays(1, &VAO);
 glGenBuffers(1, &VBO);
 glBindVertexArray(VAO);
@@ -76,7 +145,6 @@ THIS FUNCTION LOADS THE OBJECT EXPLOSION MESH DATA AND TEXTURE DATA IN GPU MEMOR
 *************************************************/
 void GameEffects::Explosion::Load()
 {
-unsigned int VBO;
 glGenVertexArrays(1, &VAO);
 glGenBuffers(1, &VBO);
 glBindVertexArray(VAO);
@@ -106,14 +174,12 @@ if(ImageData!=nullptr)
   glGenerateMipmap(GL_TEXTURE_2D);
   GameBMP::FreeBMP(ImageData);
 }
-
 }
 /*************************************************
 THIS FUNCTION LOADS THE HELP SECTION OBJECT MESH DATA AND TEXTURE DATA IN GPU MEMORY USING THE HELPER SHADER
 *************************************************/
 void GameEffects::HelpSection::Load()
 {
-unsigned int VBO;
 glGenVertexArrays(1, &VAO);
 glGenBuffers(1, &VBO);
 glBindVertexArray(VAO);
@@ -126,28 +192,34 @@ glEnableVertexAttribArray(0);
 glVertexAttribPointer(7, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 glEnableVertexAttribArray(7);
 
-glGenTextures(1, &Texture);
-glBindTexture(GL_TEXTURE_2D, Texture);
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-int Width=0;
-int Height=0;
-unsigned char* ImageData=nullptr;
-ImageData=GameBMP::LoadBMP(TextureLocation.c_str(),&Width,&Height,"Object Bullet Image");
-if(ImageData!=nullptr)
+int Width = 0;
+int Height = 0;
+unsigned char* ImageData = nullptr;
+for (int i = 0; i < 9; i++)
 {
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_BGR, GL_UNSIGNED_BYTE, ImageData);
-  glGenerateMipmap(GL_TEXTURE_2D);
-  GameBMP::FreeBMP(ImageData);
+    if (TextureLocations[i] != "")
+    {
+        Width = 0;
+        Height = 0;
+        ImageData = nullptr;
+        glGenTextures(1, &Texture[i]);
+        glBindTexture(GL_TEXTURE_2D, Texture[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        ImageData = GameBMP::LoadBMP(TextureLocations[i].c_str(), &Width, &Height, "HELP SECTION IMAGE");
+        if (ImageData != nullptr)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_BGR, GL_UNSIGNED_BYTE, ImageData);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            GameBMP::FreeBMP(ImageData);
+        }
+    }
+    else
+        Texture[i] = 0;
 }
 }
-
-
-
-
 
 /*************************************************
 THIS FUNCTION ROTATES AND TRANSLATES THE BULLET OBJECT THAT IS ASSIGNED TO A BUGGY OBJECT IN THE FOLLOWING WAY:
@@ -166,6 +238,8 @@ THIS FUNCTION ROTATES AND TRANSLATES THE BULLET OBJECT THAT IS ASSIGNED TO A BUG
 *************************************************/
 GameMath::Matrix4x4 GameEffects::Bullet::Draw()
 {
+Index = BulletIndex++;
+
 glActiveTexture(GL_TEXTURE0);
 glBindTexture(GL_TEXTURE_2D, Texture);
 GameMath::Matrix4x4 T= GameMath::Transform::Translate(CannonPosition + (CannonFront * 1.0f));
@@ -226,35 +300,34 @@ void GameEffects::Explosion::Draw(GameCamera::FPS *Camera, bool* isCameraShaking
 glActiveTexture(GL_TEXTURE0);
 glBindTexture(GL_TEXTURE_2D, Texture);
 
-if(ExplosionRate > 1.5f)
+if (ExplosionRate > 1.5f)
 {
-    isExploding=false;
-    isCameraShaking=false;
-    (*isCameraShaking_GlobalFlag)=false;//SET THE GLOBAL "ISCAMERASHAKING" FLAG TO TRUE SO
-                                        //OTHER EXPLOSION OBJECTS CAN MAKE THE CAMERA SHAKE AS WELL
+    isExploding = false;
+    isCameraShaking = false;
+    (*isCameraShaking_GlobalFlag) = false;//SET THE GLOBAL "ISCAMERASHAKING" FLAG TO TRUE SO OTHER EXPLOSION OBJECTS CAN MAKE THE CAMERA SHAKE AS WELL
 }
 else
-isExploding=true;
-
-
-if(CameraSwitch==false && isCameraShaking==true)
 {
-    Camera->CameraPosition.x+=0.5f;
-    Camera->CameraPosition.y-=0.2f;
-    CameraSwitch=true;
-}
-else if(CameraSwitch==true && isCameraShaking==true)
-{
-    Camera->CameraPosition.x-=0.5f;
-    Camera->CameraPosition.y+=0.2f;
-    CameraSwitch=false;
-}
+    isExploding = true;
+    if (CameraSwitch == false && isCameraShaking == true)
+    {
+        Camera->CameraPosition.x += 0.5f;
+        Camera->CameraPosition.y -= 0.2f;
+        CameraSwitch = true;
+    }
+    else if (CameraSwitch == true && isCameraShaking == true)
+    {
+        Camera->CameraPosition.x -= 0.5f;
+        Camera->CameraPosition.y += 0.2f;
+        CameraSwitch = false;
+    }
 
-ExplosionRate=ExplosionRate+0.01f;
-glUniformMatrix4fv(2, 1, GL_FALSE,(GameMath::Transform::Translate(BBCentroid) * GameMath::Transform::Scale(ExplosionRate,ExplosionRate+0.5f,ExplosionRate)).Addressof());
-glUniform1i(5,2);
-glBindVertexArray(VAO);
-glDrawArrays(GL_TRIANGLES, 0,VertexCount);
+    ExplosionRate = ExplosionRate + GameSettings::ExplosionRate;
+    glUniformMatrix4fv(2, 1, GL_FALSE, (GameMath::Transform::Translate(BBCentroid) * GameMath::Transform::Scale(ExplosionRate, ExplosionRate + 0.5f, ExplosionRate)).Addressof());
+    glUniform1i(5, 2);
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, VertexCount);
+}
 }
 /*************************************************
 THIS FUNCTION SIMPLY DRAWS THE HELP SECTION OBJECT ON THE SCREEN
@@ -262,7 +335,7 @@ THIS FUNCTION SIMPLY DRAWS THE HELP SECTION OBJECT ON THE SCREEN
 void GameEffects::HelpSection::Draw()
 {
 glActiveTexture(GL_TEXTURE0);
-glBindTexture(GL_TEXTURE_2D, Texture);
+glBindTexture(GL_TEXTURE_2D, Texture[State]);
 glUniform1i(5,2);
 glBindVertexArray(VAO);
 glDrawArrays(GL_TRIANGLES, 0,VertexCount);

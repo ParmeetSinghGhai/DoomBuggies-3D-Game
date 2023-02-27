@@ -1,28 +1,33 @@
 #ifndef GAMECAMERA_FPS_H_INCLUDED
 #define GAMECAMERA_FPS_H_INCLUDED
 #include <GameSettings/GameSettings.h>
+#include <GameWindow/GameWindow.h>
 class GameCamera::FPS
 {
 public:
+static bool PlayerTakenControl;
+
 float KeyboardSensitivity=GameSettings::CameraKeyBoardSensitivity;
 float MouseSensitivity=GameSettings::CameraMouseSensitivity;
 float PitchAngle=0.0f;
 float YawAngle=0.0f;
 
+GameMath::Matrix4x4 Rotation;
 GameMath::Matrix4x4 View;
 GameMath::Vector3 CameraPosition=GameMath::Vector3(0.0f,0.0f,5.0f);
 GameMath::Vector3 Front=GameMath::Vector3(0.0f,0.0f,-1.0f);
 GameMath::Vector3 Right=GameMath::Vector3(1.0f,0.0f,0.0f);
 GameMath::Vector3 Up=GameMath::Vector3(0.0f,1.0f,0.0f);
+void UpdateCameraPosition();
 void UpdateCameraView();
-
+void MouseTracking(float& YawAngle, float& PitchAngle, bool LeftMouseButtonRequired);
 
 private:
-void MouseTracking();
 int LastX=0;
 int LastY=0;
 int MouseOffsetX=0;
 int MouseOffsetY=0;
+bool MouseButtonCondition = false;
 POINT p;
 HCURSOR SavedCursor;
 bool FirstMouse=true;

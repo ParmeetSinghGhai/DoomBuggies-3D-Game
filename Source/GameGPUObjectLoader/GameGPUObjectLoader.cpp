@@ -1,13 +1,4 @@
 #include <GameGPUObjectLoader/GameGPUObjectLoader.h>
-std::vector<GameObject*> GameGPUObjectLoader::Objects;
-std::map<std::string,std::vector<void*>> GameGPUObjectLoader::Lights;
-
-std::vector<GameGPUObjectLoader::Bone> GameGPUObjectLoader::BoneData;
-std::vector<GameGPUObjectLoader::Light> GameGPUObjectLoader::LightData;
-std::vector<GameGPUObjectLoader::Material> GameGPUObjectLoader::MaterialData;
-std::vector<int> GameGPUObjectLoader::ChildBoneData;
-std::vector<float> GameGPUObjectLoader::WeightData;
-
 int GameGPUObjectLoader::Global_ChildBoneIndex=0;
 int GameGPUObjectLoader::Global_WeightIndex=0;
 int GameGPUObjectLoader::Global_BoneIndex=0;
@@ -64,37 +55,6 @@ AND THE FOLLOWING COLLECTIONS TO SAVE OBJECTS OF THESE DATA STRUCTURES ALONG WIT
 **************************************************/
 
 
-/************************************************
-THIS FUNCTION SAVES A GAMEOBJECT IN THE "OBJECTS" COLLECTION OF GAMEOBJECT OBJECTS
-************************************************/
-void GameGPUObjectLoader::AddObject(GameObject* Object)
-{
-Objects.push_back(Object);
-}
-/************************************************
-THIS FUNCTION SAVES A GAMELIGHT OF TYPE:SUNLIGHT IN THE "LIGHTS" COLLECTION OF GAMELIGHT OBJECTS
-USING THE KEY "SUNLIGHT"
-************************************************/
-void GameGPUObjectLoader::AddObject(GameLight::SunLight* Light)
-{
-Lights["SunLight"].push_back((void*)Light);
-}
-/************************************************
-THIS FUNCTION SAVES A GAMELIGHT OF TYPE:POINTLIGHT IN THE "LIGHTS" COLLECTION OF GAMELIGHT OBJECTS
-USING THE KEY "POINTLIGHT"
-************************************************/
-void GameGPUObjectLoader::AddObject(GameLight::PointLight* Light)
-{
-Lights["PointLight"].push_back((void*)Light);
-}
-/************************************************
-THIS FUNCTION SAVES A GAMELIGHT OF TYPE:SPOTLIGHT IN THE "LIGHTS" COLLECTION OF GAMELIGHT OBJECTS
-USING THE KEY "SPOTLIGHT"
-************************************************/
-void GameGPUObjectLoader::AddObject(GameLight::SpotLight* Light)
-{
-Lights["SpotLight"].push_back((void*)Light);
-}
 /************************************************
 THIS FUNCTION LOADS ALL GAMEOBJECTS SAVED IN "OBJECTS" COLLECTION IN THE VERTEX SHADER.
 THE PROCEDURE INVOLVED IS AS FOLLOWS:
@@ -235,448 +195,299 @@ glTexImage2D - TEXTURING ALLOWS ELEMENTS OF AN IMAGE ARRAY TO BE READ BY SHADERS
 glGenerateMipmap - GLGENERATEMIPMAP AND GLGENERATETEXTUREMIPMAP GENERATES MIPMAPS FOR THE SPECIFIED TEXTURE OBJECT. FOR GLGENERATEMIPMAP, THE TEXTURE OBJECT
                    THAT IS BOUND TO TARGET.
 ************************************************/
-void GameGPUObjectLoader::Load()
-{
-int WeightData_Binding=0;
-int ChildBoneData_Binding=1;
-int BoneData_Binding=2;
-int MaterialData_Binding=3;
-int LightData_Binding=4;
 
-if(Objects.size() > 0)
+void GameGPUObjectLoader::ExtractObjectData(GameObject* Object, std::vector<Material>& MaterialData, std::vector<Bone>& BoneData, std::vector<int>& ChildBoneData, std::vector<float>& WeightData)
 {
-//OPENGL SHARED BUFFER BINDINGS
-Bone *bone=nullptr;
-Material *material=nullptr;
-GameMesh *Mesh=nullptr;
-GameArmature *Armature=nullptr;
-unsigned char *ImageData=nullptr;
-
-int Width=0;
-int Height=0;
-//*************************************************************
-// PROCESSING OBJECTS
-//*************************************************************
-for(GameObject* Object: Objects)
-{
-    Mesh=&Object->Mesh;
-    Armature=&Object->Armature;
+    if (Object == nullptr)
+        return;
+    
+    Bone* bone = nullptr;
+    Material* material = nullptr;
+    GameMesh* Mesh = nullptr;
+    GameArmature* Armature = nullptr;
+    
+    Mesh = &Object->Mesh;
+    Armature = &Object->Armature;
 
     //*************************************************************
     // LOAD MATERIAL DATA
     //*************************************************************
-    if(Mesh->Materials.size() > 0)
+    if (Mesh->Materials.size() > 0)
     {
-      for(GameMesh::MaterialData* Mat:Mesh->Materials)
-      {
-        material=new Material();
-        material->AmbientStrength=Mat->AmbientStrength;
-        material->ShininessIndex=Mat->ShininessIndex;
-        material->DiffuseColor[0]=Mat->DiffuseColor.x;
-        material->DiffuseColor[1]=Mat->DiffuseColor.y;
-        material->DiffuseColor[2]=Mat->DiffuseColor.z;
-        material->DiffuseColor[3]=0.0f;
-        material->SpecularColor[0]=Mat->SpecularColor.x;
-        material->SpecularColor[1]=Mat->SpecularColor.y;
-        material->SpecularColor[2]=Mat->SpecularColor.z;
-        material->SpecularColor[3]=0.0f;
-
-
-        //*************************************************************
-        // LOAD MATERIAL TEXTURE DATA
-        //*************************************************************
-        if(Mat->DiffuseMap!="")
+        for (GameMesh::MaterialData* Mat : Mesh->Materials)
         {
-            glGenTextures(1, &Object->DiffuseMap);
-            glBindTexture(GL_TEXTURE_2D, Object->DiffuseMap);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            Width=0;
-            Height=0;
-            ImageData=nullptr;
-            ImageData=GameBMP::LoadBMP((Mat->DiffuseMap).c_str(),&Width,&Height,"Object "+std::to_string(Object->Index) + " Diffuse Map");
-            if(ImageData!=nullptr)
-            {
-              glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_BGR, GL_UNSIGNED_BYTE, ImageData);
-              glGenerateMipmap(GL_TEXTURE_2D);
-              GameBMP::FreeBMP(ImageData);
-            }
-            material->DiffuseMap=Object->DiffuseMap;
-            glBindTexture(GL_TEXTURE_2D,0);
+            material = new GameGPUObjectLoader::Material();
+            material->AmbientStrength = Mat->AmbientStrength;
+            material->ShininessIndex = Mat->ShininessIndex;
+            material->DiffuseColor[0] = Mat->DiffuseColor.x;
+            material->DiffuseColor[1] = Mat->DiffuseColor.y;
+            material->DiffuseColor[2] = Mat->DiffuseColor.z;
+            material->DiffuseColor[3] = 0.0f;
+            material->SpecularColor[0] = Mat->SpecularColor.x;
+            material->SpecularColor[1] = Mat->SpecularColor.y;
+            material->SpecularColor[2] = Mat->SpecularColor.z;
+            material->SpecularColor[3] = 0.0f;
+            material->DiffuseMap = Object->DiffuseMap;
+            material->AmbientMap = Object->AmbientMap;
+            material->SpecularMap = Object->SpecularMap;
+            MaterialData.push_back(*material);
         }
-        if(Mat->SpecularMap!="")
-        {
-            glGenTextures(1, &Object->SpecularMap);
-            glBindTexture(GL_TEXTURE_2D, Object->SpecularMap);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            Width=0;
-            Height=0;
-            ImageData=nullptr;
-            ImageData=GameBMP::LoadBMP((Mat->SpecularMap).c_str(),&Width,&Height,"Object "+std::to_string(Object->Index) +" Specular Map");
-            if(ImageData!=nullptr)
-            {
-              glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, Width, Height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, ImageData);
-              glGenerateMipmap(GL_TEXTURE_2D);
-              GameBMP::FreeBMP(ImageData);
-            }
-            material->SpecularMap=Object->SpecularMap;
-            glBindTexture(GL_TEXTURE_2D,0);
-        }
-        if(Mat->AmbientMap!="")
-        {
-            glGenTextures(1, &Object->AmbientMap);
-            glBindTexture(GL_TEXTURE_2D, Object->AmbientMap);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            Width=0;
-            Height=0;
-            ImageData=nullptr;
-            ImageData=GameBMP::LoadBMP((Mat->AmbientMap).c_str(),&Width,&Height,"Object "+std::to_string(Object->Index) + " Ambient Map");
-            if(ImageData!=nullptr)
-            {
-              glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_BGR, GL_UNSIGNED_BYTE, ImageData);
-              glGenerateMipmap(GL_TEXTURE_2D);
-              GameBMP::FreeBMP(ImageData);
-            }
-            material->AmbientMap=Object->AmbientMap;
-            glBindTexture(GL_TEXTURE_2D,0);
-        }
-
-        MaterialData.push_back(*material);
-      }
     }
-
-    //*************************************************************
-    // LOAD MESH DATA
-    //*************************************************************
-    std::vector<float> v;
-    std::vector<float> t;
-    std::vector<int> m;
-    std::vector<int> vi;
-    //ITERATE THROUGH ALL THE FACES OF THE MESH
-    for(unsigned int i=0;i< Mesh->Faces.size();i++)
-    {
-     //ITERATE THROUGH THE 3 VERTICES OF A FACE
-     for(int j=0;j<3;j++)
-     {
-      //*************************************************************
-      // LOAD THE X , Y AND Z COORDINATE OF A VERTEX
-      //*************************************************************
-      v.push_back(Mesh->Vertices[Mesh->Faces[i]->Indices[j]]->x);
-      v.push_back(Mesh->Vertices[Mesh->Faces[i]->Indices[j]]->y);
-      v.push_back(Mesh->Vertices[Mesh->Faces[i]->Indices[j]]->z);
-      //*************************************************************
-      // LOAD VERTEX INDEX OF A VERTEX
-      //*************************************************************
-      vi.push_back(Mesh->Faces[i]->Indices[j]);
-      //*************************************************************
-      // LOAD UV COORDINATES OF A VERTEX
-      //*************************************************************
-      if(Mesh->Faces[i]->UVCoords.size() > 0)
-      {
-       t.push_back(Mesh->Faces[i]->UVCoords[j]->x);
-       t.push_back(Mesh->Faces[i]->UVCoords[j]->y);
-      }
-      //*************************************************************
-      // LOAD MATERIAL INDEX FOR A FACE
-      //*************************************************************
-      if(Mesh->Materials.size() > 0)
-      m.push_back(Mesh->Materials.at(Mesh->Faces[i]->Material_index)->Index);
-     }
-    }
-
-    unsigned int VAO,VVBO,VIVBO,TVBO,MVBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VVBO);
-    glGenBuffers(1, &VIVBO);
-    glGenBuffers(1, &TVBO);
-    glGenBuffers(1, &MVBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VVBO);
-    glBufferData(GL_ARRAY_BUFFER, v.size() * sizeof(float), &v[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    if(t.size() > 0)
-    {
-    glBindBuffer(GL_ARRAY_BUFFER, TVBO);
-    glBufferData(GL_ARRAY_BUFFER, t.size()  * sizeof(float), &t[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    }
-
-    if(m.size() > 0)
-    {
-    glBindBuffer(GL_ARRAY_BUFFER, MVBO);
-    glBufferData(GL_ARRAY_BUFFER, m.size()  * sizeof(int), &m[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(int), (void*)0);
-    glEnableVertexAttribArray(2);
-    Object->NoMaterialFlag=0;//SETTING THE OBJECT'S "NOMATERIALFLAG" VALUE FROM DEFAULT -1 TO 0 INDICATING THAT MATERIAL IS PRESENT
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, VIVBO);
-    glBufferData(GL_ARRAY_BUFFER, vi.size() * sizeof(float), &vi[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(3);
-
-    Object->VAO=VAO;
-    Object->VAOCount=vi.size();
-    Object->BoundingBox=Mesh->BoundingBox;//COPYING OVER THE MESH' BOUNDING BOX OVER TO THE OBJECT'S BOUNDING BOX
-    Object->BoundingBox->Object=Object;//CREATING A REFERENCE TO THIS OBJECT IN THIS OBJECT'S BOUNDING BOX.
-                                       //SO THIS GAMEOBJECT CAN BE REFERENCED DIRECTLY FROM WITHIN ITS BOUNDING BOX
-
     //*************************************************************
     // LOADING ARMATURE AND VERTEX WEIGHT DATA
     //*************************************************************
     // ASSIGNING UNIQUE INDICES TO BONES AS PER THEIR POSITION
     // IN THE BONE SHARED BUFFER OBJECT IN THE VERTEX SHADER
-    for(std::map<std::string,GameArmature::Bone*>::iterator boneit=Armature->Bones.begin();boneit!=Armature->Bones.end();boneit++)
+    for (std::map<std::string, GameArmature::Bone*>::iterator boneit = Armature->Bones.begin(); boneit != Armature->Bones.end(); boneit++)
     {
-       boneit->second->Index=Global_BoneIndex;
-       Global_BoneIndex++;
+        boneit->second->Index = Global_BoneIndex;
+        Global_BoneIndex++;
     }
 
-    unsigned int BoneCount=0;
-    for(std::map<std::string,GameArmature::Bone*>::iterator boneit=Armature->Bones.begin();boneit!=Armature->Bones.end();boneit++)
+    unsigned int BoneCount = 0;
+    for (std::map<std::string, GameArmature::Bone*>::iterator boneit = Armature->Bones.begin(); boneit != Armature->Bones.end(); boneit++)
     {
-      //MARK THE GLOBAL INDEX OF THE FIRST BONE FOR THIS OBJECT
-      if(BoneCount==0)
-      Object->BoneStartIndex=boneit->second->Index;
+        //MARK THE GLOBAL INDEX OF THE FIRST BONE FOR THIS OBJECT
+        if (BoneCount == 0)
+            Object->BoneStartIndex = boneit->second->Index;
 
-      //CREATE EMPTY MATRICES FOR THE BONE
-      bone=new GameGPUObjectLoader::Bone();
-      GameMath::Transform::CopyMatrixtoArray(nullptr,&bone->SelfMatrix[0][0]);
-      GameMath::Transform::CopyMatrixtoArray(nullptr,&bone->InheritedMatrix[0][0]);
-      GameMath::Transform::CopyMatrixtoArray(nullptr,&bone->OutMatrix[0][0]);
+        //CREATE EMPTY MATRICES FOR THE BONE
+        bone = new GameGPUObjectLoader::Bone();
+        GameMath::Transform::CopyMatrixtoArray(nullptr, &bone->SelfMatrix[0][0]);
+        GameMath::Transform::CopyMatrixtoArray(nullptr, &bone->InheritedMatrix[0][0]);
+        GameMath::Transform::CopyMatrixtoArray(nullptr, &bone->OutMatrix[0][0]);
 
-      //MARK THE GLOBAL INDEX OF THE FIRST CHILD BONE FOR THIS OBJECT
-      bone->ChildStartIndex=Global_ChildBoneIndex;
-      for(std::map<std::string,GameArmature::Bone*>::iterator childit=(boneit->second)->Child.begin();childit!=(boneit->second)->Child.end();childit++)
-      {
-         ChildBoneData.push_back(childit->second->Index);
-         Global_ChildBoneIndex++;
-      }
-      //MARK THE GLOBAL INDEX OF THE LAST CHILD BONE FOR THIS OBJECT
-      bone->ChildEndIndex=Global_ChildBoneIndex;
+        //MARK THE GLOBAL INDEX OF THE FIRST CHILD BONE FOR THIS OBJECT
+        bone->ChildStartIndex = Global_ChildBoneIndex;
+        for (std::map<std::string, GameArmature::Bone*>::iterator childit = (boneit->second)->Child.begin(); childit != (boneit->second)->Child.end(); childit++)
+        {
+            ChildBoneData.push_back(childit->second->Index);
+            Global_ChildBoneIndex++;
+        }
+        //MARK THE GLOBAL INDEX OF THE LAST CHILD BONE FOR THIS OBJECT
+        bone->ChildEndIndex = Global_ChildBoneIndex;
 
-      //CREATE A VERTEX GROUP DATA FOR THIS BONE IN THIS OBJECT
-      GameMesh::VertexGroupData* vertexgroup=Mesh->VertexGroups[boneit->first];
+        //CREATE A VERTEX GROUP DATA FOR THIS BONE IN THIS OBJECT
+        GameMesh::VertexGroupData* vertexgroup = Mesh->VertexGroups[boneit->first];
 
-      //MARK THE GLOBAL INDEX OF THE FIRST WEIGHT DATA FOR THIS BONE IN THIS OBJECT
-      bone->WeightStartIndex=Global_WeightIndex;
-      for(float Weight:vertexgroup->Weights)
-      {
-          WeightData.push_back(Weight);
-          Global_WeightIndex++;
-      }
-      bone->WeightEndIndex=Global_WeightIndex;
-      //MARK THE GLOBAL INDEX OF THE LAST WEIGHT DATA FOR THIS BONE IN THIS OBJECT
+        //MARK THE GLOBAL INDEX OF THE FIRST WEIGHT DATA FOR THIS BONE IN THIS OBJECT
+        bone->WeightStartIndex = Global_WeightIndex;
+        for (float Weight : vertexgroup->Weights)
+        {
+            WeightData.push_back(Weight);
+            Global_WeightIndex++;
+        }
+        bone->WeightEndIndex = Global_WeightIndex;
+        //MARK THE GLOBAL INDEX OF THE LAST WEIGHT DATA FOR THIS BONE IN THIS OBJECT
 
-      //SAVE THE NEW BONE IN THE COLLECTION: "BONE DATA"
-      BoneData.push_back(*bone);
+        //SAVE THE NEW BONE IN THE COLLECTION: "BONE DATA"
+        BoneData.push_back(*bone);
 
-      //MARK THE GLOBAL INDEX OF THE LAST BONE FOR THIS OBJECT
-      if(BoneCount==Armature->Bones.size()-1)
-      Object->BoneEndIndex=boneit->second->Index;
+        //MARK THE GLOBAL INDEX OF THE LAST BONE FOR THIS OBJECT
+        if (BoneCount == Armature->Bones.size() - 1)
+            Object->BoneEndIndex = boneit->second->Index;
 
-      BoneCount++;
-    }
-std::cout<<"Object #"<<Object->Index<<" Loaded in GPU \n";
-}
-unsigned int MaterialData_SSBO;
-unsigned int WeightData_SSBO;
-unsigned int ChildBoneData_SSBO;
-unsigned int BoneData_SSBO;
-//*************************
-// MATERIAL DATA BINDING
-//*************************
-glGenBuffers(1, &MaterialData_SSBO);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, MaterialData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,MaterialData_Binding,MaterialData_SSBO);
-glBufferData(GL_SHADER_STORAGE_BUFFER, MaterialData.size() * sizeof(Material), &MaterialData[0], GL_DYNAMIC_DRAW);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-MaterialData.clear();
-//*************************
-// BONE DATA BINDING
-//*************************
-glGenBuffers(1, &BoneData_SSBO);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, BoneData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BoneData_Binding,BoneData_SSBO);
-glBufferData(GL_SHADER_STORAGE_BUFFER, BoneData.size() * sizeof(Bone), &BoneData[0], GL_DYNAMIC_DRAW);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-BoneData.clear();
-//*************************
-// CHILD DATA BINDING
-//*************************
-glGenBuffers(1, &ChildBoneData_SSBO);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, ChildBoneData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,ChildBoneData_Binding,ChildBoneData_SSBO);
-glBufferData(GL_SHADER_STORAGE_BUFFER, ChildBoneData.size() * sizeof(int), &ChildBoneData[0], GL_DYNAMIC_DRAW);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-ChildBoneData.clear();
-//*************************
-// WEIGHT DATA BINDING
-//*************************
-glGenBuffers(1, &WeightData_SSBO);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, WeightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,WeightData_Binding,WeightData_SSBO);
-glBufferData(GL_SHADER_STORAGE_BUFFER, WeightData.size() * sizeof(float), &WeightData[0], GL_DYNAMIC_DRAW);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-WeightData.clear();
-//**************************
-// LINKING BONEDATA BINDING AND SSBO
-//**************************
-for(GameObject* Object: Objects)
-{
-Object->BoneData_SSBO=BoneData_SSBO;
-Object->BoneData_Binding=BoneData_Binding;
-}
-//******************************
-// END OF ALL OBJECT PROCESSING
-//******************************
-}
-
-//*************************************************************
-// Processing Lights
-//*************************************************************
-if(Lights.size() > 0)
-{
-    GameLight::SunLight* sunlight=nullptr;
-    GameLight::PointLight* pointlight=nullptr;
-    GameLight::SpotLight* spotlight=nullptr;
-    Light* light=nullptr;
-
-    for(void* L:Lights["SunLight"])
-    {
-      sunlight=(GameLight::SunLight*)L;
-      light=new Light();
-
-      light->LightType=0;
-
-      light->Color[0]=sunlight->Color[0];
-      light->Color[1]=sunlight->Color[1];
-      light->Color[2]=sunlight->Color[2];
-      light->Color[3]=0.0f;
-
-      light->Direction[0]=sunlight->Direction[0];
-      light->Direction[1]=sunlight->Direction[1];
-      light->Direction[2]=sunlight->Direction[2];
-      light->Direction[3]=-1.0f;
-
-      sunlight->DataIndex=LightData.size() * sizeof(Light);
-      LightData.push_back(*light);
+        BoneCount++;
     }
 
-    for(void* L:Lights["PointLight"])
+}
+
+void GameGPUObjectLoader::LoadObjects()
+{
+    if (!GameObject::ALL_Objects_Loaded)
     {
-      pointlight=(GameLight::PointLight*)L;
-      light=new Light();
+        GameGPUObjectLoader::Global_ChildBoneIndex = 0;
+        GameGPUObjectLoader::Global_WeightIndex = 0;
+        GameGPUObjectLoader::Global_BoneIndex = 0;
+        
+        std::vector<Material> MaterialData;
+        std::vector<Bone> BoneData;
+        std::vector<int> ChildBoneData;
+        std::vector<float> WeightData;
+        
+        for (GameObject* Object : GameObject::Players)
+            ExtractObjectData(Object, MaterialData, BoneData, ChildBoneData, WeightData);
+        for (GameObject* Object : GameObject::Enemies)
+            ExtractObjectData(Object, MaterialData, BoneData, ChildBoneData, WeightData);
+        for (GameObject* Object: GameObject::Inanimates)
+            ExtractObjectData(Object, MaterialData, BoneData, ChildBoneData, WeightData);
 
-      light->LightType=1;
-
-      light->Color[0]=pointlight->Color[0];
-      light->Color[1]=pointlight->Color[1];
-      light->Color[2]=pointlight->Color[2];
-      light->Color[3]=0.0f;
-
-      light->Position[0]=pointlight->Position[0];
-      light->Position[1]=pointlight->Position[1];
-      light->Position[2]=pointlight->Position[2];
-      light->Position[3]=1.0f;
-
-      light->Constant=pointlight->Constant;
-      light->Linear=pointlight->Linear;
-      light->Quadratic=pointlight->Quadratic;
-
-      pointlight->DataIndex=LightData.size()  * sizeof(Light);
-      LightData.push_back(*light);
+        ExtractObjectData(GameObject::RealWorld, MaterialData, BoneData, ChildBoneData, WeightData);
+        ExtractObjectData(GameObject::HealthBox, MaterialData, BoneData, ChildBoneData, WeightData);
+        ExtractObjectData(GameObject::WeaponBox, MaterialData, BoneData, ChildBoneData, WeightData);
+        
+        //*************************
+        // MATERIAL DATA BINDING
+        //*************************
+        if (MaterialData.size() > 0)
+        {
+            glGenBuffers(1, &GameObject::ALL_MaterialData_SSBO);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameObject::ALL_MaterialData_SSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GameObject::MaterialData_Binding, GameObject::ALL_MaterialData_SSBO);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, MaterialData.size() * sizeof(Material), &MaterialData[0], GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            std::cout << "LOADED ALL MATERIALS, TOTAL::"+std::to_string(MaterialData.size())+"\n";
+            MaterialData.clear();
+        }
+        //*************************
+        // BONE DATA BINDING
+        //*************************
+        if (BoneData.size() > 0)
+        {
+            glGenBuffers(1, &GameObject::ALL_BoneData_SSBO);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameObject::ALL_BoneData_SSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GameObject::BoneData_Binding, GameObject::ALL_BoneData_SSBO);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, BoneData.size() * sizeof(Bone), &BoneData[0], GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            std::cout << "LOADED ALL BONES, TOTAL::" + std::to_string(BoneData.size()) + "\n";
+            BoneData.clear();
+        }
+        //*************************
+        // CHILD DATA BINDING
+        //*************************
+        if (ChildBoneData.size() > 0)
+        {
+            glGenBuffers(1, &GameObject::ALL_ChildBoneData_SSBO);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameObject::ALL_ChildBoneData_SSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GameObject::ChildBoneData_Binding, GameObject::ALL_ChildBoneData_SSBO);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, ChildBoneData.size() * sizeof(int), &ChildBoneData[0], GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            std::cout << "LOADED ALL CHILD BONES, TOTAL::" + std::to_string(ChildBoneData.size()) + "\n";
+            ChildBoneData.clear();
+        }
+        //*************************
+        // WEIGHT DATA BINDING
+        //*************************
+        if (WeightData.size() > 0)
+        {
+            glGenBuffers(1, &GameObject::ALL_WeightData_SSBO);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameObject::ALL_WeightData_SSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GameObject::WeightData_Binding, GameObject::ALL_WeightData_SSBO);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, WeightData.size() * sizeof(float), &WeightData[0], GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            std::cout << "LOADED ALL WEIGHTS, TOTAL::" + std::to_string(WeightData.size()) + "\n";
+            WeightData.clear();
+        }
+        std::cout << "ALL OBJECT DATA LOADED INTO GPU\n";
+        GameObject::ALL_Objects_Loaded = true;
     }
+}
 
-    for(void* L:Lights["SpotLight"])
+void GameGPUObjectLoader::UnloadObjects()
+{
+    if (GameObject::ALL_Objects_Loaded)
     {
-      spotlight=(GameLight::SpotLight*)L;
-      light=new Light();
+        GameGPUObjectLoader::Global_ChildBoneIndex = 0;
+        GameGPUObjectLoader::Global_WeightIndex = 0;
+        GameGPUObjectLoader::Global_BoneIndex = 0;
 
-      light->LightType=2;
-
-      light->Color[0]=spotlight->Color[0];
-      light->Color[1]=spotlight->Color[1];
-      light->Color[2]=spotlight->Color[2];
-      light->Color[3]=0.0f;
-
-      light->Position[0]=spotlight->Position[0];
-      light->Position[1]=spotlight->Position[1];
-      light->Position[2]=spotlight->Position[2];
-      light->Position[3]=1.0f;
-
-      light->Direction[0]=spotlight->Direction[0];
-      light->Direction[1]=spotlight->Direction[1];
-      light->Direction[2]=spotlight->Direction[2];
-      light->Direction[3]=0.0f;
-
-      light->Constant=spotlight->Constant;
-      light->Linear=spotlight->Linear;
-      light->Quadratic=spotlight->Quadratic;
-
-      light->CutOffAngle=cos(GameMath::Transform::GetRadian(spotlight->CutOffAngle));
-      light->OuterCutOffAngle=cos(GameMath::Transform::GetRadian(spotlight->OuterCutOffAngle));
-
-      spotlight->DataIndex=LightData.size() * sizeof(Light);
-      LightData.push_back(*light);
+        glDeleteBuffers(1, &GameObject::ALL_MaterialData_SSBO);
+        glDeleteBuffers(1, &GameObject::ALL_BoneData_SSBO);
+        glDeleteBuffers(1, &GameObject::ALL_ChildBoneData_SSBO);
+        glDeleteBuffers(1, &GameObject::ALL_WeightData_SSBO);
+        std::cout << "ALL OBJECT DATA UNLOADED FROM GPU\n";
+        GameObject::ALL_Objects_Loaded = false;
     }
+}
 
-    GameLight::TotalLights=LightData.size();
-
-//*************************
-// Light Data Binding
-//*************************
-unsigned int LightData_SSBO;
-glGenBuffers(1, &LightData_SSBO);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, LightData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,LightData_Binding,LightData_SSBO);
-glBufferData(GL_SHADER_STORAGE_BUFFER, LightData.size() * sizeof(Light), &LightData[0], GL_DYNAMIC_DRAW);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-LightData.clear();
-//*************************
-// Linking LightData SSBO
-//*************************
-for(void* L:Lights["SunLight"])
+void GameGPUObjectLoader::LoadLights()
 {
-    ((GameLight::SunLight*)L)->LightData_SSBO=LightData_SSBO;
-    ((GameLight::SunLight*)L)->LightData_Binding=LightData_Binding;
+    GameGPUObjectLoader::Light* light = nullptr;
+    std::vector<Light> LightData;
+    if (!GameLight::ALL_Lights_Loaded)
+    {
+        for (SunLight* sunlight : GameLight::SunLights)
+        {
+            light = new Light();
+            light->LightType = 0;
+
+            light->Color[0] = sunlight->Color[0];
+            light->Color[1] = sunlight->Color[1];
+            light->Color[2] = sunlight->Color[2];
+            light->Color[3] = 0.0f;
+
+            light->Direction[0] = sunlight->Direction[0];
+            light->Direction[1] = sunlight->Direction[1];
+            light->Direction[2] = sunlight->Direction[2];
+            light->Direction[3] = -1.0f;
+
+            sunlight->DataIndex = LightData.size() * sizeof(Light);
+            LightData.push_back(*light);
+        }
+        for (PointLight* pointlight : GameLight::PointLights)
+        {
+            light = new Light();
+
+            light->LightType = 1;
+
+            light->Color[0] = pointlight->Color[0];
+            light->Color[1] = pointlight->Color[1];
+            light->Color[2] = pointlight->Color[2];
+            light->Color[3] = 0.0f;
+
+            light->Position[0] = pointlight->Position[0];
+            light->Position[1] = pointlight->Position[1];
+            light->Position[2] = pointlight->Position[2];
+            light->Position[3] = 1.0f;
+
+            light->Constant = pointlight->Constant;
+            light->Linear = pointlight->Linear;
+            light->Quadratic = pointlight->Quadratic;
+
+            pointlight->DataIndex = LightData.size() * sizeof(Light);
+            LightData.push_back(*light);
+        }
+        for (SpotLight* spotlight : GameLight::SpotLights)
+        {
+            light = new Light();
+
+            light->LightType = 2;
+
+            light->Color[0] = spotlight->Color[0];
+            light->Color[1] = spotlight->Color[1];
+            light->Color[2] = spotlight->Color[2];
+            light->Color[3] = 0.0f;
+
+            light->Position[0] = spotlight->Position[0];
+            light->Position[1] = spotlight->Position[1];
+            light->Position[2] = spotlight->Position[2];
+            light->Position[3] = 1.0f;
+
+            light->Direction[0] = spotlight->Direction[0];
+            light->Direction[1] = spotlight->Direction[1];
+            light->Direction[2] = spotlight->Direction[2];
+            light->Direction[3] = 0.0f;
+
+            light->Constant = spotlight->Constant;
+            light->Linear = spotlight->Linear;
+            light->Quadratic = spotlight->Quadratic;
+
+            light->CutOffAngle = cos(GameMath::Transform::GetRadian(spotlight->CutOffAngle));
+            light->OuterCutOffAngle = cos(GameMath::Transform::GetRadian(spotlight->OuterCutOffAngle));
+
+            spotlight->DataIndex = LightData.size() * sizeof(Light);
+            LightData.push_back(*light);
+        }
+        //*************************
+        // Light Data Binding
+        //*************************
+        glGenBuffers(1, &GameLight::LightData_SSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_SSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GameLight::LightData_Binding, GameLight::LightData_SSBO);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, LightData.size() * sizeof(Light), &LightData[0], GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        std::cout << "LOADED ALL LIGHTS, TOTAL::" + std::to_string(LightData.size()) + "\n";
+        LightData.clear();
+        GameLight::ALL_Lights_Loaded = true;
+    }
 }
 
-for(void* L:Lights["PointLight"])
+void GameGPUObjectLoader::UnloadLights()
 {
-    ((GameLight::PointLight*)L)->LightData_SSBO=LightData_SSBO;
-    ((GameLight::PointLight*)L)->LightData_Binding=LightData_Binding;
+    if (GameLight::ALL_Lights_Loaded)
+    {
+        glDeleteBuffers(1, &GameLight::LightData_SSBO);
+        std::cout << "ALL LIGHT DATA UNLOADED FROM GPU\n";
+        GameLight::ALL_Lights_Loaded = false;
+    }
 }
-
-for(void* L:Lights["SpotLight"])
-{
-    ((GameLight::SpotLight*)L)->LightData_SSBO=LightData_SSBO;
-    ((GameLight::SpotLight*)L)->LightData_Binding=LightData_Binding;
-}
-
-std::cout<<"Light(s) loaded in GPU = "<<GameLight::TotalLights<<" \n";
-//******************************
-// End of Light Data Processing
-//******************************
-}
-
-}
-
-
-
-

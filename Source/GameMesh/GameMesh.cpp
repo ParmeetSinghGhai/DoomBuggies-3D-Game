@@ -1,9 +1,40 @@
 #include <GameMesh/GameMesh.h>
 int GameMesh::MaterialIndex=0;
+int GameMesh::MeshIndex = 0;
 
-GameMesh::MaterialData::MaterialData() // @suppress("Class members should be properly initialized")
+GameMesh::MaterialData::MaterialData(int MeshIndex) // @suppress("Class members should be properly initialized")
 {
-Index=MaterialIndex++;
+    Index=MaterialIndex++;
+    this->MeshIndex = MeshIndex;
+}
+
+GameMesh::MaterialData::~MaterialData()
+{
+    std::cout << "MATERIALDATA #" << std::to_string(Index) << " FROM MESH #" << std::to_string(MeshIndex) << " GOT DESTROYED\n";
+}
+
+GameMesh::~GameMesh()
+{
+    for (GameMath::Vector3* vec3 : Vertices)
+        delete vec3;
+    for (GameMesh::FaceData* face : Faces)
+    {
+        for (GameMath::Vector2* uv : face->UVCoords)
+        delete uv;
+        delete face;
+    }
+    for (GameMesh::MaterialData* mat : Materials)
+        delete mat;
+    for (std::pair<std::string, VertexGroupData*> vgd : VertexGroups)
+    {
+        vgd.second->Weights.clear();
+        delete vgd.second;
+    }
+    Vertices.clear();
+    Faces.clear();
+    Materials.clear();
+    VertexGroups.clear();
+    std::cout << "MESH " << Name << " #"<<std::to_string(Index)<<" FROM OBJECT #"<<std::to_string(ObjectIndex)<<" GOT DESTROYED\n";
 }
 
 //********************************

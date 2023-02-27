@@ -1,9 +1,28 @@
 #include<GameArmature/GameArmature.h>
 int GameArmature::BoneIndex=0;
+int GameArmature::ArmatureIndex = 0;
 
-GameArmature::Bone::Bone() // @suppress("Class members should be properly initialized")
+GameArmature::Bone::Bone(int ArmatureIndex) // @suppress("Class members should be properly initialized")
 {
 this->Index=BoneIndex++;
+this->ArmatureIndex = ArmatureIndex;
+}
+
+GameArmature::Bone::~Bone()
+{
+    std::cout << "BONE "<<Name<<" #" << std::to_string(Index) << " FROM ARMATURE #" << std::to_string(ArmatureIndex) << " GOT DESTROYED\n";
+}
+
+GameArmature::~GameArmature()
+{
+for (std::pair<std::string, Bone*> bone : Bones)
+{
+if (bone.second->Child.size() > 0)
+    bone.second->Child.clear();
+delete bone.second;
+}
+Bones.clear();
+std::cout << "ARMATURE " << Name << " #"<<std::to_string(Index)<<" FROM OBJECT #"<<std::to_string(ObjectIndex)<<" GOT DESTROYED\n";
 }
 /*************************************************
 THIS FUNCTION CONNECTS THE BONES TOGETHER USING THEIR PARENT AND CHILD RELATIONSHIP. ITS WORKING IS AS FOLLOWS:

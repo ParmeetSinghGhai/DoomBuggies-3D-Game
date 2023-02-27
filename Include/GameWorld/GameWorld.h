@@ -42,7 +42,7 @@ int zbound;
 
 std::vector<float> WorldVBOBuffer;
 std::map<int,std::map<int,GameWorldCube*>> WorldCoordMap;
-
+~GameWorld();
 GameWorld(float minx,float maxx,float miny,float maxy,float minz,float maxz);
 GameWorldCube* MakeCube(int z,int x,float minx,float minz,float maxy);
 void Draw();
@@ -63,12 +63,13 @@ float B=0.0f;
 float ColorEffect=1.0f;
 bool ColorSwitch=true;
 GameMath::Vector3 ColorTint;
+GameMath::Matrix4x4 FinalMatrix;
 
 unsigned int VAO=-1;
 unsigned int VBO=-1;
+~GameWorldCube();
 void Load(std::vector<float>* VBOBuffer,int SmallestDivision);
 void Load(int SmallestDivision);
 void DrawForeground();
-void Free();
 };
 #endif

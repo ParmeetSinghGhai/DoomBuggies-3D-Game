@@ -1,4 +1,33 @@
 #include <GameCamera/GameCamera.h>
+bool GameCamera::FPS::PlayerTakenControl = false;
+
+
+void GameCamera::FPS::UpdateCameraPosition()
+{
+    //******* Keyboard Updates **********************
+    if (GetKeyState(87) & 0x8000)
+    {
+        CameraPosition = CameraPosition + (Front * KeyboardSensitivity);
+        //GameWindow::KeyCode = '/0';
+    }
+    if (GetKeyState(83) & 0x8000)
+    {
+        CameraPosition = CameraPosition - (Front * KeyboardSensitivity);
+        //GameWindow::KeyCode = '/0';
+    }
+    if (GetKeyState(65) & 0x8000)
+    {
+        CameraPosition = CameraPosition - (Right * KeyboardSensitivity);
+        //GameWindow::KeyCode = '/0';
+    }
+    if (GetKeyState(68) & 0x8000)
+    {
+        CameraPosition = CameraPosition + (Right * KeyboardSensitivity);
+        //GameWindow::KeyCode = '/0';
+    }
+    //***********************************************
+}
+
 /**************************************************
 YAW ANGLE IS THE ROTATION ANGLE WHEN ROTATION TAKES PLACE ALONG THE Y AXIS
 PITCH ANGLE IS THE ROTATION ANGLE WHEN ROTATION TAKES PLACE ALONG THE X AXIS
@@ -117,8 +146,8 @@ VIEW MATRIX IS AS FOLLOWS:
 **************************************************/
 void GameCamera::FPS::UpdateCameraView()
 {
-  if(GameWindow::HasFocus==true)
-  MouseTracking();
+  if(GameWindow::HasFocus==true && !PlayerTakenControl)
+  MouseTracking(YawAngle,PitchAngle,true);
 
   //******* Mouse Updates *************************
   //******* Multiplication order = X Axis (first) , Y Axis (Second) = Y Matrix * X Matrix
@@ -131,18 +160,7 @@ void GameCamera::FPS::UpdateCameraView()
   Right=GameMath::Vector3(YCos,0.0f,-YSin).Normalize();
   Up=GameMath::Vector3((YSin * XSin),XCos,(YCos * XSin)).Normalize();
   //***********************************************
-
-  //******* Keyboard Updates **********************
-  if(GetKeyState(87) & 0x8000)
-  CameraPosition = CameraPosition + (Front * KeyboardSensitivity);
-  if(GetKeyState(83) & 0x8000)
-  CameraPosition = CameraPosition - (Front * KeyboardSensitivity);
-  if(GetKeyState(65) & 0x8000)
-  CameraPosition = CameraPosition - (Right * KeyboardSensitivity);
-  if(GetKeyState(68) & 0x8000)
-  CameraPosition = CameraPosition + (Right * KeyboardSensitivity);
-  //***********************************************
-
+  
   //******** View Matrix Updates ******************
   View.Matrix[0][0]=YCos;
   View.Matrix[0][1]=XSin * YSin;
@@ -185,16 +203,16 @@ THIS FUCNTION IS DESIGNED TO GET YAW AND PITCH ANGLES FROM MOUSE INPUT, IT DOES 
 
    C) CHECK IF THE MOUSE IS IN THE ALLOWED MOUSE SPACE AS DESCRIBED BELOW
 
-          ***********************************************
-          *                Y+5                          * GAMEWINDOW WITH (X,Y,WIDTH,HEIGHT)
-          *     ****************************            *
-          *     *                          *            *
-          * X+5 *  ALLOWED MOUSE SPACE     * (X+WIDTH)-5*
-          *     *                          *            *
-          *     *                          *            *
-          *     ****************************            *
-          *              (Y+HEIGHT)-5                   *
-          ***********************************************
+        ***********************************************
+        *                Y+5                          * GAMEWINDOW WITH (X,Y,WIDTH,HEIGHT)
+        *     ****************************            *
+        *     *                          *            *
+        * X+5 *  ALLOWED MOUSE SPACE     * (X+WIDTH)-5*
+        *     *                          *            *
+        *     *                          *            *
+        *     ****************************            *
+        *              (Y+HEIGHT)-5                   *
+        ***********************************************
 
       IF NOT THEN MOVE THE MOUSE TO THE CENTER OF THE GAME WINDOW
       THE CENTER OF THE GAME WINDOW IS = WIDTH OF THE GAME WINDOW / 2 , HEIGHT OF THE GAME WINDOW / 2
@@ -216,7 +234,7 @@ THIS FUCNTION IS DESIGNED TO GET YAW AND PITCH ANGLES FROM MOUSE INPUT, IT DOES 
    THIS PREVENTS THE MOUSE CURSOR FROM GETTING PUT BACK INTO THE MIDDLE OF THE GAME WINDOW
    AND ALSO ALLOWS THE MOUSE CURSOR TO SHOW UP AGAIN SO USER CAN USE THAT CURSOR TO INTERACT WITH GAME OBJECTS
 /***********************************************/
-void GameCamera::FPS::MouseTracking()
+void GameCamera::FPS::MouseTracking(float& YawAngle,float& PitchAngle,bool LeftMouseButtonRequired=true)
 {
 if(GameWindow::HasFocus==false)
 {
@@ -256,8 +274,8 @@ MouseOffsetY=p.y - LastY;
 LastX=p.x;
 LastY=p.y;
 
-
-if(GetTickCount() > GameWindow::MouseTimer + CameraHasMouse_ActivationTime && GameWindow::MouseLButtonPressed==true)
+MouseButtonCondition = LeftMouseButtonRequired ? GameWindow::MouseLButtonPressed : GameWindow::MouseMButtonPressed;
+if(GetTickCount() > GameWindow::MouseTimer + CameraHasMouse_ActivationTime && MouseButtonCondition)
 {
    YawAngle=YawAngle - (MouseOffsetX * MouseSensitivity);
    PitchAngle=PitchAngle - (MouseOffsetY * MouseSensitivity);

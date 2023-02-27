@@ -1,5 +1,24 @@
 #include <GameObject/GameObject.h>
 int GameObject::ObjectIndex=0;
+unsigned int GameObject::ALL_MaterialData_SSBO;
+unsigned int GameObject::ALL_WeightData_SSBO;
+unsigned int GameObject::ALL_ChildBoneData_SSBO;
+unsigned int GameObject::ALL_BoneData_SSBO;
+int GameObject::WeightData_Binding = 0;
+int GameObject::ChildBoneData_Binding = 1;
+int GameObject::BoneData_Binding = 2;
+int GameObject::MaterialData_Binding = 3;
+bool GameObject::ALL_Objects_Loaded = false;
+std::vector<GameObject*> GameObject::Players;
+std::vector<GameObject*> GameObject::Enemies;
+std::vector<GameObject*> GameObject::Inanimates;
+GameObject* GameObject::HealthBox=nullptr;
+GameObject* GameObject::WeaponBox=nullptr;
+GameObject* GameObject::RealWorld=nullptr;
+GameObject* GameObject::SelectedPlayer=nullptr;
+GameObject* GameObject::LastSelectedPlayer = nullptr;
+GameObject* GameObject::SelectedEnemy = nullptr;
+GameWorldCube* GameObject::SelectedWorldCube=nullptr;
 /*************************************************
 MAIN PROPERTIES USED IN THE OBJECT DATA STRUCTURE:
 
@@ -55,9 +74,6 @@ GAMEMATH::VECTOR3 BuggyFront - THIS DIRECTION VECTOR DETERMINES THE DIRECTION TH
 GAMEMATH::VECTOR3 CannonFront - THIS DIRECTION VECTOR DETERMINES THE DIRECTION THE BUGGY'S MACHINE GUN IS POINTING AT
 *************************************************/
 
-
-
-
 /*************************************************
 EVERY MOVABLE OBJECT ALSO CALLED "BUGGY" IN THIS PROGRAM'S CONTEXT HAS THE FOLLOWING TRANSFORMATIONS LINKED TO IT
 1) THE OBJECT ITSELF CAN BE ROTATED WITH IT BEING AT THE ORIGIN, THIS MAKES IT A LOCAL TRANSFORMATION
@@ -104,6 +120,240 @@ GameObject::GameObject() // @suppress("Class members should be properly initiali
 this->Index=ObjectIndex++;
 }
 
+GameObject::~GameObject()
+{
+    if (Info != nullptr)
+        delete Info;
+    if (BoundingBox != nullptr)
+        delete BoundingBox;
+    if (_Bullet != nullptr)
+        delete _Bullet;
+    if (_BulletFire != nullptr)
+        delete _BulletFire;
+    if (_Explosion != nullptr)
+        delete _Explosion;
+    Unload();
+    std::cout << "GAME OBJECT #" << std::to_string(Index) << " GOT DESTROYED\n";
+}
+/*************************************************
+THIS FUNCTION 'DESTROYS' AN OBJECT SO IT DOES NOT RENDER ANYMORE BOTH IN THE FOREGROUND FRAME BUFFER
+AND THE BACKGROUND FRAME BUFFER SO IT DOES NOT HAVE ANY IMPACT ON THE GAME WHATSOEVER
+
+1) FIRST IT CHECKS IF THE OBJECT IS ACTIVE BY CHECKING THE "ISALIVE" BOOLEAN VARIABLE OF THE OBJECT
+   THIS IS REQUIRED AS MULTIPLE OBJECTS COULD BE ASSIGNED THE SAME TARGET OBJECT SO ONE OBJECT
+   COULD HAVE ALREADY DESTROYED A TARGET ASSIGNED IT WHILE THE SECOND A.I OBJECT TRIES TO DESTOY THAT SAME
+   TARGET. TO PREVENT THAT FROM HAPPENING THIS CHECK IS REQUIRED
+
+2) IF THE OBJECT IS ALIVE AND IS NEEDED TO BE DESTROYED THEN
+   A) WE SET THE "SOURCEWORLDCUBE" OBJECT REFERENCE TO NULLPTR WHICH WAS EARLIER OCCUPIED BY
+      THIS OBJECT THAT IS BEING DESTROYED. THIS ALLOWS THAT WORLD CUBE TO OCCUPY OTHER OBJECTS
+   B) WE SET THE "DESTINATIONWORLDCUBE" TO NULLPTR AS THIS OBJECT WONT BE MOVING ANYMORE AFTER ITS
+      DESTROYED
+   C) WE SET THE "ATTACKOBJECT" TO NULLPTR SINCE THIS OBJECT WONT BE ATTACKING ANYOTHER OBJECT AFTER ITS DESTROYED
+   D) WE SET THE "SOURCEWORLDCUBE" TO NULLPTR SINCE THIS OBJECT IS NOT OCCUPYING THAT WORLD CUBE ANYMORE
+   E) WE SET THE BOUNDINGBOX VALUES TO 0.0
+   F) WE SET THE "ISALIVE" VARIABLE OF THE OBJECT TO FALSE INDICATING THAT THE OBJECT IS NOT ALIVE ANYMORE
+   G) WE SET THE "ISEXPLODING" VARIABLE OF THE OBJECT TO TRUE TO INITIATE THE EXPLOSING EFFECT FOR THAT OBJECT
+*************************************************/
+void GameObject::Destroy()
+{
+    if (isAlive)
+    {
+        _Explosion->isExploding = true;
+        SourceWorldCube->Object = nullptr;
+        DestinationWorldCube = nullptr;
+        AttackObject = nullptr;
+        SourceWorldCube = nullptr;
+        isAlive = false;
+    }
+}
+
+void GameObject::Load()
+{
+    //*************************************************************
+    // LOAD TEXTURE DATA
+    //*************************************************************
+    unsigned char* ImageData = nullptr;
+    int Width = 0;
+    int Height = 0;
+    if (Mesh.Materials.size() > 0)
+    {
+        for (GameMesh::MaterialData* Mat : Mesh.Materials)
+        {
+            std::cout << "LOADING MATERIAL " + std::to_string(Mat->Index) + "\n";
+            if (Mat->DiffuseMap != "")
+            {
+                glGenTextures(1, &DiffuseMap);
+                glBindTexture(GL_TEXTURE_2D, DiffuseMap);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+                Width = 0;
+                Height = 0;
+                ImageData = nullptr;
+                ImageData = GameBMP::LoadBMP((Mat->DiffuseMap).c_str(), &Width, &Height, "OBJECT# " + std::to_string(Index) + " LOADED DIFFUSE MAP");
+                if (ImageData != nullptr)
+                {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_BGR, GL_UNSIGNED_BYTE, ImageData);
+                    glGenerateMipmap(GL_TEXTURE_2D);
+                    GameBMP::FreeBMP(ImageData);
+                }
+                glBindTexture(GL_TEXTURE_2D, 0);
+                std::cout << "OBJECT SPECULAR MAP = " + std::to_string(SpecularMap) + "\n";
+            }
+            if (Mat->SpecularMap != "")
+            {
+                glGenTextures(1, &SpecularMap);
+                glBindTexture(GL_TEXTURE_2D, SpecularMap);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+                Width = 0;
+                Height = 0;
+                ImageData = nullptr;
+                ImageData = GameBMP::LoadBMP((Mat->SpecularMap).c_str(), &Width, &Height, "OBJECT# " + std::to_string(Index) + " LOADED SPECULAR MAP");
+                if (ImageData != nullptr)
+                {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, Width, Height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, ImageData);
+                    glGenerateMipmap(GL_TEXTURE_2D);
+                    GameBMP::FreeBMP(ImageData);
+                }
+                glBindTexture(GL_TEXTURE_2D, 0);
+                std::cout << "OBJECT SPECULAR MAP = " + std::to_string(SpecularMap) + "\n";
+            }
+            if (Mat->AmbientMap != "")
+            {
+                glGenTextures(1, &AmbientMap);
+                glBindTexture(GL_TEXTURE_2D, AmbientMap);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+                Width = 0;
+                Height = 0;
+                ImageData = nullptr;
+                ImageData = GameBMP::LoadBMP((Mat->AmbientMap).c_str(), &Width, &Height, "OBJECT# " + std::to_string(Index) + " LOADED AMBIENT MAP");
+                if (ImageData != nullptr)
+                {
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_BGR, GL_UNSIGNED_BYTE, ImageData);
+                    glGenerateMipmap(GL_TEXTURE_2D);
+                    GameBMP::FreeBMP(ImageData);
+                }
+                glBindTexture(GL_TEXTURE_2D, 0);
+                std::cout << "OBJECT AMBIENT MAP = " + std::to_string(AmbientMap) + "\n";
+            }
+        }
+    }
+    //*************************************************************
+    // LOAD MESH DATA
+    //*************************************************************
+    std::vector<float> v;
+    std::vector<float> t;
+    std::vector<int> m;
+    std::vector<int> vi;
+    //ITERATE THROUGH ALL THE FACES OF THE MESH
+    for (unsigned int i = 0; i < Mesh.Faces.size(); i++)
+    {
+        //ITERATE THROUGH THE 3 VERTICES OF A FACE
+        for (int j = 0; j < 3; j++)
+        {
+            //*************************************************************
+            // LOAD THE X , Y AND Z COORDINATE OF A VERTEX
+            //*************************************************************
+            v.push_back(Mesh.Vertices[Mesh.Faces[i]->Indices[j]]->x);
+            v.push_back(Mesh.Vertices[Mesh.Faces[i]->Indices[j]]->y);
+            v.push_back(Mesh.Vertices[Mesh.Faces[i]->Indices[j]]->z);
+            //*************************************************************
+            // LOAD VERTEX INDEX OF A VERTEX
+            //*************************************************************
+            vi.push_back(Mesh.Faces[i]->Indices[j]);
+            //*************************************************************
+            // LOAD UV COORDINATES OF A VERTEX
+            //*************************************************************
+            if (Mesh.Faces[i]->UVCoords.size() > 0)
+            {
+                t.push_back(Mesh.Faces[i]->UVCoords[j]->x);
+                t.push_back(Mesh.Faces[i]->UVCoords[j]->y);
+            }
+            //*************************************************************
+            // LOAD MATERIAL INDEX FOR A FACE
+            //*************************************************************
+            if (Mesh.Materials.size() > 0)
+                m.push_back(Mesh.Materials.at(Mesh.Faces[i]->Material_index)->Index);
+        }
+    }
+
+    glGenVertexArrays(1, &this->VAO);
+    glGenBuffers(1, &VVBO);
+    glGenBuffers(1, &VIVBO);
+    glGenBuffers(1, &TVBO);
+    glGenBuffers(1, &MVBO);
+
+    glBindVertexArray(this->VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VVBO);
+    glBufferData(GL_ARRAY_BUFFER, v.size() * sizeof(float), &v[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    if (t.size() > 0)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, TVBO);
+        glBufferData(GL_ARRAY_BUFFER, t.size() * sizeof(float), &t[0], GL_STATIC_DRAW);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+    }
+
+    if (m.size() > 0)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, MVBO);
+        glBufferData(GL_ARRAY_BUFFER, m.size() * sizeof(int), &m[0], GL_STATIC_DRAW);
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(int), (void*)0);
+        glEnableVertexAttribArray(2);
+        NoMaterialFlag = 0;//SETTING THE OBJECT'S "NOMATERIALFLAG" VALUE FROM DEFAULT -1 TO 0 INDICATING THAT MATERIAL IS PRESENT
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, VIVBO);
+    glBufferData(GL_ARRAY_BUFFER, vi.size() * sizeof(float), &vi[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(3);
+
+    VAOCount = vi.size();
+    BoundingBox = Mesh.BoundingBox;//COPYING OVER THE MESH' BOUNDING BOX OVER TO THE OBJECT'S BOUNDING BOX
+    BoundingBox->Object = this;//CREATING A REFERENCE TO THIS OBJECT IN THIS OBJECT'S BOUNDING BOX.
+                               //SO THIS GAMEOBJECT CAN BE REFERENCED DIRECTLY FROM WITHIN ITS BOUNDING BOX
+    std::cout << "OBJECT# " + std::to_string(Index) + " GOT LOADED INTO GPU\n";
+    v.clear();
+    t.clear();
+    m.clear();
+    vi.clear();
+}
+
+void GameObject::Unload()
+{
+    if (VVBO >= 0)
+        glDeleteBuffers(0, &VVBO);
+    if (TVBO >= 0)
+        glDeleteBuffers(0, &TVBO);
+    if (MVBO >= 0)
+        glDeleteBuffers(0, &MVBO);
+    if (VIVBO >= 0)
+        glDeleteBuffers(0, &VIVBO);
+    if (VAO >= 0)
+        glDeleteVertexArrays(0, &VAO);
+    if (DiffuseMap >= 0)
+        glDeleteTextures(1, &DiffuseMap);
+    if (SpecularMap >= 0)
+        glDeleteTextures(1, &SpecularMap);
+    if (AmbientMap >= 0)
+        glDeleteTextures(1, &AmbientMap);
+    std::cout << "OBJECT# " + std::to_string(Index) + " GOT UNLOADED FROM GPU";
+}
+
 /*************************************************
 THIS FUNCTION UPDATES THE MATRIX OF THE BONE IDENTIFIED BY THE ARGUMENT "BONENAME" IN THE VERTEX
 SHADER'S STORAGE BUFFER CALLED "BONE". THIS MATRIX IS LATER USED FOR TRANSFORMING THE VERTICES
@@ -112,8 +362,8 @@ IN THE MESH WHICH ARE ASSIGNED TO THIS BONE VIA VERTEX GROUP OF SIMILAR NAME
 void GameObject::SetBoneMatrix(std::string BoneName,GameMath::Matrix4x4 Mat)
 {
 int BoneOffset=((Armature.Bones[BoneName]->Index * 52) + 4) * sizeof(float);
-glBindBuffer(GL_SHADER_STORAGE_BUFFER, BoneData_SSBO);
-glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BoneData_Binding,BoneData_SSBO);
+glBindBuffer(GL_SHADER_STORAGE_BUFFER, GameObject::ALL_BoneData_SSBO);
+glBindBufferBase(GL_SHADER_STORAGE_BUFFER,GameObject::BoneData_Binding,GameObject::ALL_BoneData_SSBO);
 glBufferSubData(GL_SHADER_STORAGE_BUFFER,BoneOffset, 16 *  sizeof(float), Mat.Addressof());
 glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
@@ -151,45 +401,6 @@ return false;
 }
 
 /*************************************************
-THIS FUNCTION 'DESTROYS' AN OBJECT SO IT DOES NOT RENDER ANYMORE BOTH IN THE FOREGROUND FRAME BUFFER
-AND THE BACKGROUND FRAME BUFFER SO IT DOES NOT HAVE ANY IMPACT ON THE GAME WHATSOEVER
-
-1) FIRST IT CHECKS IF THE OBJECT IS ACTIVE BY CHECKING THE "ISALIVE" BOOLEAN VARIABLE OF THE OBJECT
-   THIS IS REQUIRED AS MULTIPLE OBJECTS COULD BE ASSIGNED THE SAME TARGET OBJECT SO ONE OBJECT
-   COULD HAVE ALREADY DESTROYED A TARGET ASSIGNED IT WHILE THE SECOND A.I OBJECT TRIES TO DESTOY THAT SAME
-   TARGET. TO PREVENT THAT FROM HAPPENING THIS CHECK IS REQUIRED
-
-2) IF THE OBJECT IS ALIVE AND IS NEEDED TO BE DESTROYED THEN
-   A) WE SET THE "SOURCEWORLDCUBE" OBJECT REFERENCE TO NULLPTR WHICH WAS EARLIER OCCUPIED BY
-      THIS OBJECT THAT IS BEING DESTROYED. THIS ALLOWS THAT WORLD CUBE TO OCCUPY OTHER OBJECTS
-   B) WE SET THE "DESTINATIONWORLDCUBE" TO NULLPTR AS THIS OBJECT WONT BE MOVING ANYMORE AFTER ITS
-      DESTROYED
-   C) WE SET THE "ATTACKOBJECT" TO NULLPTR SINCE THIS OBJECT WONT BE ATTACKING ANYOTHER OBJECT AFTER ITS DESTROYED
-   D) WE SET THE "SOURCEWORLDCUBE" TO NULLPTR SINCE THIS OBJECT IS NOT OCCUPYING THAT WORLD CUBE ANYMORE
-   E) WE SET THE BOUNDINGBOX VALUES TO 0.0
-   F) WE SET THE "ISALIVE" VARIABLE OF THE OBJECT TO FALSE INDICATING THAT THE OBJECT IS NOT ALIVE ANYMORE
-   G) WE SET THE "ISEXPLODING" VARIABLE OF THE OBJECT TO TRUE TO INITIATE THE EXPLOSING EFFECT FOR THAT OBJECT
-*************************************************/
-void GameObject::Destroy()
-{
-if(isAlive==false)
-return;
-
-SourceWorldCube->Object=nullptr;
-DestinationWorldCube=nullptr;
-AttackObject=nullptr;
-SourceWorldCube=nullptr;
-BoundingBox->minx=0.0f;
-BoundingBox->maxx=0.0f;
-BoundingBox->miny=0.0f;
-BoundingBox->maxy=0.0f;
-BoundingBox->minz=0.0f;
-BoundingBox->maxz=0.0f;
-BoundingBox->Centroid.y=-10000000.0f;
-isAlive=false;
-_Explosion->isExploding=true;
-}
-/*************************************************
 THIS FUNCTIONS IS MEANT TO BE USED BY A.I OBJECTS TO TRACK DOWN THE CLOSEST ENEMY OBJECT TO IT
 THAT IS WITHIN ITS WEAPON'S FIRING RANGE. THE PROCEDURE INVOLVED IS AS FOLLOWS:
 
@@ -212,39 +423,261 @@ THAT IS WITHIN ITS WEAPON'S FIRING RANGE. THE PROCEDURE INVOLVED IS AS FOLLOWS:
    ELSE SET THE CALLNG OBJECT'S VARIABLE "TARGETOUTOFRANGE" TO TRUE
 4) RETURN THE CLOSEST OBJECT FOUND OR NULLPTR IF NO OBJECT WAS FOUND
 *************************************************/
-GameObject* GameObject::Find(GameObject** SampleObjects,int ObjectCount)
+GameWorldCube* GameObject::FindEmptyNeighbour(GameWorldCube* Source)
+{
+    if (Source->Neighbours != nullptr)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            if (Source->Neighbours[i]->Object == nullptr)
+            {
+                return Source->Neighbours[i];
+            }
+        }
+        for (int i = 0; i < 8; i++)
+        {
+            FindEmptyNeighbour(Source->Neighbours[i]);
+        }
+    }
+    else
+        return nullptr;
+}
+
+GameWorldCube* GameObject::FindClosestEmptyNeighbour(GameWorldCube* Source, GameWorldCube* Destination)
+{
+    std::vector<std::pair<float,GameWorldCube*>> candidates;
+    float distance=0.0f;
+    for (int i = 0; i < 8; i++)
+    {
+        distance = (Destination->Centroid - Source->Neighbours[i]->Centroid).Length();
+        if (Source->Neighbours[i]->Object == nullptr)
+            candidates.push_back(std::pair<float, GameWorldCube*>(distance, Source->Neighbours[i]));
+    }
+    std::sort(candidates.begin(), candidates.end(), []
+    (std::pair<float, GameWorldCube*>& p1, std::pair<float, GameWorldCube*>& p2)
+        {
+            return p1.first < p2.first;
+        }
+    );
+
+    if (candidates.size() > 0)
+        return (candidates[0]).second;
+    else
+    {
+        for (int i = 0; i < 8; i++)
+            FindClosestEmptyNeighbour(Source->Neighbours[i], Destination);
+    }
+}
+
+GameObject* GameObject::AISearchTarget()
 {
 float Distance=0.0f;
 float LeastDistance=1000000.0f;
 GameObject* ClosestObject=nullptr;
 
-for(int i=0;i<ObjectCount;i++)
+for (GameObject* Player : GameObject::Players)
 {
-    if((*SampleObjects)->isAlive==false || (*SampleObjects)->Index==Index || (*SampleObjects)->ObjectType!=1)
-    {
-        SampleObjects++;
+    if (!Player->isAlive)
         continue;
-    }
     else
     {
-        Distance=((*SampleObjects)->BoundingBox->Centroid - BoundingBox->Centroid).Length();
-        if(Distance < LeastDistance)
+        Distance = (Player->BoundingBox->Centroid - BoundingBox->Centroid).Length();
+        if (Distance < LeastDistance)
         {
-            LeastDistance=Distance;
-            ClosestObject=(*SampleObjects);
+            LeastDistance = Distance;
+            ClosestObject = Player;
         }
-        SampleObjects++;
     }
 }
 if(ClosestObject!=nullptr)
 {
-    if(LeastDistance >= WeaponRange)
-    TargetOutOfRange=true;
-    else
-    TargetOutOfRange=false;
+    if (LeastDistance >= GameSettings::EnemyWeaponRange)
+        TargetOutOfRange = true;
+    else    
+        TargetOutOfRange=false;
+    return ClosestObject;
 }
-return ClosestObject;
+else
+return nullptr;
 }
+
+
+
+
+void GameObject::FrontWheelTurn(float Angle)
+{
+    GameMath::Vector3 Pivot;
+    Pivot = Armature.Bones["FrontWheel"]->Head + ((Armature.Bones["FrontWheel"]->Tail - Armature.Bones["FrontWheel"]->Head).Normalize()) * 0.5f;
+
+    float RAngle = (float)((int)10.0f % 360);
+    GameMath::Matrix4x4 RM;
+    GameMath::Matrix4x4 pTM = GameMath::Transform::Translate(Armature.Bones["FrontWheel"]->Head);
+    GameMath::Matrix4x4 nTM = GameMath::Transform::Translate(-Armature.Bones["FrontWheel"]->Head);
+    RM = pTM * GameMath::Transform::RotateQ(-ZAxis, RAngle) * nTM;
+        
+    pTM = GameMath::Transform::Translate(Pivot);
+    nTM = GameMath::Transform::Translate(-Pivot);
+    RM = pTM * GameMath::Transform::RotateQ(YAxis, Angle) * nTM * RM;
+    SetBoneMatrix("FrontWheel", RM);
+}
+
+void GameObject::WheelRotation(bool FrontWheel_Clockwise=true, bool BackWheel_Clockwise = true,int TurnDirection=0)
+{
+    FrontWheelRotationAngle += FrontWheel_Clockwise ? 10.0f : -10.0f;
+    BackWheelRotationAngle += BackWheel_Clockwise ? 10.0f : -10.0f;
+    if (FrontWheelRotationAngle > 360.0f)
+        FrontWheelRotationAngle = 0.0f;
+    if (BackWheelRotationAngle > 360.0f)
+        BackWheelRotationAngle = 0.0f;
+    FrontWheelRotationAngle = (float)((int)FrontWheelRotationAngle % 360);
+    BackWheelRotationAngle = (float)((int)FrontWheelRotationAngle % 360);
+    
+    GameMath::Vector3 Pivot = Armature.Bones["FrontWheel"]->Head + ((Armature.Bones["FrontWheel"]->Tail - Armature.Bones["FrontWheel"]->Head).Normalize()) * 0.5f;
+    float RAngle = (float)((int)10.0f % 360);
+    
+
+    GameMath::Matrix4x4 RM;
+    GameMath::Matrix4x4 pTM = GameMath::Transform::Translate(Armature.Bones["FrontWheel"]->Head);
+    GameMath::Matrix4x4 nTM = GameMath::Transform::Translate(-Armature.Bones["FrontWheel"]->Head);
+    RM = pTM * GameMath::Transform::RotateQ(-ZAxis, FrontWheelRotationAngle) * nTM;
+
+    if (TurnDirection != 0)
+    {
+        RAngle = TurnDirection < 0 ? -30.0f : 30.0f;
+        pTM = GameMath::Transform::Translate(Pivot);
+        nTM = GameMath::Transform::Translate(-Pivot);
+        RM = pTM * GameMath::Transform::RotateQ(YAxis, RAngle) * nTM * RM;
+    }
+
+    SetBoneMatrix("FrontWheel", RM);
+
+    pTM = GameMath::Transform::Translate(Armature.Bones["BackWheel"]->Head);
+    nTM = GameMath::Transform::Translate(-Armature.Bones["BackWheel"]->Head);
+    RM = pTM * GameMath::Transform::RotateQ(-ZAxis, BackWheelRotationAngle) * nTM;
+    SetBoneMatrix("BackWheel", RM);
+}
+
+void GameObject::PlayerControlledWorldMovement(int Time_Per_Frame, GameCamera::FPS& FPSCamera)
+{
+    FrontWheelTurn(0.0f);
+    if (GetKeyState(87) & 0x8000) 
+    {
+        WheelRotation();
+        float FrameDistance = (Speed * SpeedConstant) * Time_Per_Frame;
+        GameMath::Matrix4x4 T = GameMath::Transform::Translate((FPSCamera.Front)*FrameDistance);
+        BuggyTranslationMatrix = T * BuggyTranslationMatrix;
+        BoundingBox->Centroid = T * BoundingBox->Centroid;
+        FPSCamera.CameraPosition = T * FPSCamera.CameraPosition;
+        BoundingBox->CalculateXYZ();
+
+        BuggyFinalMatrix = BuggyTranslationMatrix * BuggyRotationMatrix;
+        BoundingBox->FinalMatrix = BuggyFinalMatrix;
+        FPSCamera.UpdateCameraView();
+    }
+    else if (GetKeyState(83) & 0x8000)
+    {
+        WheelRotation(false,false);
+        float FrameDistance = (Speed * SpeedConstant) * Time_Per_Frame;
+        GameMath::Matrix4x4 T = GameMath::Transform::Translate((FPSCamera.Front) * -FrameDistance);
+        BuggyTranslationMatrix = T * BuggyTranslationMatrix;
+        BoundingBox->Centroid = T * BoundingBox->Centroid;
+        FPSCamera.CameraPosition = T * FPSCamera.CameraPosition;
+        BoundingBox->CalculateXYZ();
+
+        BuggyFinalMatrix = BuggyTranslationMatrix * BuggyRotationMatrix;
+        BoundingBox->FinalMatrix = BuggyFinalMatrix;
+        FPSCamera.UpdateCameraView();
+    }
+    else if (GetKeyState(65) & 0x8000)
+    {
+        WheelRotation(true,true,1);
+        TurnAngle += 0.5f;
+        FPSCamera.YawAngle += 0.5f;
+        
+        GameMath::Vector3 Position = GameMath::Vector3(BuggyTranslationMatrix.Matrix[3][0], BuggyTranslationMatrix.Matrix[3][1], BuggyTranslationMatrix.Matrix[3][2]);
+        GameMath::Matrix4x4 RM;
+        GameMath::Vector3 D = FPSCamera.CameraPosition - Position;
+        GameMath::Vector3 pivot = D.Normalize() * D.Length();
+        GameMath::Matrix4x4 r = GameMath::Transform::RotateQ('Y', TurnAngle);
+        GameMath::Matrix4x4 n = GameMath::Transform::Translate(-pivot);
+        GameMath::Matrix4x4 p = GameMath::Transform::Translate(pivot);
+        BuggyRotationMatrix = p * r * n;
+        BoundingBox->Centroid = FPSCamera.CameraPosition + (FPSCamera.Front * D.Length());
+        BoundingBox->Centroid.y -= 1.5f;
+
+        BuggyFinalMatrix = BuggyTranslationMatrix * BuggyRotationMatrix;
+        BoundingBox->FinalMatrix = BuggyFinalMatrix;
+        BoundingBox->CalculateXYZ();
+        FPSCamera.UpdateCameraView();
+        BuggyFront = FPSCamera.Front;
+        CannonFront = CannonRotationMatrix * BuggyFront;
+        _Bullet->RotationMatrix = r * _Bullet->RotationMatrix;
+        _Explosion->BBCentroid = BoundingBox->Centroid;
+        _Explosion->BBCentroid.y = 0.0f;
+    }
+    else if (GetKeyState(68) & 0x8000)
+    {
+        WheelRotation(true,true,-1);
+        TurnAngle -= 0.5f;
+        FPSCamera.YawAngle -=0.5f;
+                
+        GameMath::Vector3 Position = GameMath::Vector3(BuggyTranslationMatrix.Matrix[3][0], BuggyTranslationMatrix.Matrix[3][1], BuggyTranslationMatrix.Matrix[3][2]);
+        GameMath::Matrix4x4 RM;
+        GameMath::Vector3 D = FPSCamera.CameraPosition - Position;
+        GameMath::Vector3 pivot = D.Normalize() * D.Length();
+        GameMath::Matrix4x4 r = GameMath::Transform::RotateQ('Y', TurnAngle);
+        GameMath::Matrix4x4 n = GameMath::Transform::Translate(-pivot);
+        GameMath::Matrix4x4 p = GameMath::Transform::Translate(pivot);
+        BuggyRotationMatrix = p * r * n;
+        BoundingBox->Centroid = FPSCamera.CameraPosition + (FPSCamera.Front * D.Length());
+        BoundingBox->Centroid.y -= 1.5f;
+
+        BuggyFinalMatrix = BuggyTranslationMatrix * BuggyRotationMatrix;
+        BoundingBox->FinalMatrix = BuggyFinalMatrix;
+        BoundingBox->CalculateXYZ();
+        FPSCamera.UpdateCameraView();
+        BuggyFront = FPSCamera.Front;
+        CannonFront = CannonRotationMatrix * BuggyFront;
+        _Bullet->RotationMatrix = r * _Bullet->RotationMatrix;
+        _Explosion->BBCentroid = BoundingBox->Centroid;
+        _Explosion->BBCentroid.y = 0.0f;
+    }
+   
+}
+
+void GameObject::PlayerControlledAttack(GameCamera::FPS& FPSCamera)
+{
+    float dummy;
+    FPSCamera.MouseTracking(CannonRotationAngle_Buffer, dummy,false);
+    GameMath::Matrix4x4 pTM = GameMath::Transform::Translate(Armature.Bones["MachineGun"]->Head);
+    GameMath::Matrix4x4 nTM = GameMath::Transform::Translate(-Armature.Bones["MachineGun"]->Head);
+    CannonRotationAngle = CannonRotationAngle_Buffer - LastCannonRotationAngle;
+    LastCannonRotationAngle = CannonRotationAngle_Buffer;
+   
+    if (CannonRotationAngle != LastCannonRotationAngle)
+    {
+        GameMath::Matrix4x4 Rot = GameMath::Transform::RotateQ(YAxis, CannonRotationAngle);
+        CannonRotationMatrix = Rot * CannonRotationMatrix;
+        CannonFront = Rot * CannonFront;
+        SetBoneMatrix("MachineGun", pTM * CannonRotationMatrix * nTM);
+        _Bullet->CannonFront = CannonFront;
+        _Bullet->TranslationMatrix = GameMath::Matrix4x4();
+        _Bullet->RotationMatrix = CannonRotationMatrix;
+        _Bullet->CannonPosition = BoundingBox->Centroid;
+    }
+
+    //GameMath::Vector3 Roller = (Armature.Bones["MachineGun"]->Tail - Armature.Bones["MachineGun"]->Head).Normalize();
+    //std::cout << Roller;
+
+    if (GameWindow::MouseLButtonPressed)
+        CannonFiring(10.0f);
+}
+
+void GameObject::PlayerControlledCannonFiring()
+{
+    _Bullet->TranslationMatrix = GameMath::Transform::Translate(BoundingBox->Centroid + (_Bullet->CannonFront * 1.0f));
+}
+
 /*************************************************
 THIS FUNCTION IS USED BY BOTH THE A.I OBJECTS AND THE FRIENDLY OBJECTS
 BEFORE THIS FUNCTION IS CALLED THE OBJECT'S "ATTACKOBJECT" VARIABLE IS SET TO ANOTHER OBJECT
@@ -283,88 +716,102 @@ THE PROCEDURE FOLLOWED IS:
    C) MOVE THE CANNON OF CALLING OBJECT TOWARDS THE ATTACK OBJECT
    D) SIMULATE BULLETS FIRING TOWARDS THE ATTACK OBJECT
 **************************************************/
-void GameObject::Attack(GameObject** SampleObjects,int ObjectCount,GameObject** SampleInanimateObjects,int InanimateObjectCount)
+void GameObject::Attack()
 {
-if(AttackObject==nullptr)
-return;
+    if (AttackObject == nullptr)
+        return;
 
-if(HALT==true)
-{
-AttackObject=nullptr;
-HALT=false;
-return;
-}
-
-if(WeaponQuantity <= 0.0f)
-{
-AttackObject=nullptr;
-return;
-}
-
-GameMath::Vector3 AttackDirection=(AttackObject->BoundingBox->Centroid - BoundingBox->Centroid);
-float AttackDistance=AttackDirection.Length();
-if(AttackDistance > WeaponRange)
-{
-AttackObject=nullptr;
-return;
-}
-else
-AttackDirection=AttackDirection.Normalize();
-
-float SampleDistance;
-GameMath::Vector3 SamplePoint;
-//COLLISION TEST WITH GAMEOBJECTS
-for(int i=0;i< ObjectCount;i++)
-{
-    if((*SampleObjects)->Index==AttackObject->Index || (*SampleObjects)->Index==Index)
+    if (HALT == true)
     {
-        SampleObjects++;
-        continue;
+        AttackObject = nullptr;
+        HALT = false;
+        return;
+    }
+
+    if (WeaponQuantity <= 0.0f)
+    {
+        AttackObject = nullptr;
+        return;
+    }
+
+    GameMath::Vector3 AttackDirection = (AttackObject->BoundingBox->Centroid - BoundingBox->Centroid);
+    float AttackDistance = AttackDirection.Length();
+    if (ObjectType == 1 && AttackDistance > GameSettings::PlayerWeaponRange)
+    {
+        AttackObject = nullptr;
+        return;
+    }
+    else if (ObjectType == 2 && AttackDistance > GameSettings::EnemyWeaponRange)
+    {
+        AttackObject = nullptr;
+        return;
     }
     else
-    {
-        SampleDistance=((*SampleObjects)->BoundingBox->Centroid - BoundingBox->Centroid).Length();
-        if(SampleDistance < AttackDistance)
-        {
-          SamplePoint=BoundingBox->Centroid + (AttackDirection * SampleDistance);
-          if(CollisionDetection(&SamplePoint,(*SampleObjects)->BoundingBox)==true)
-          {
-            AttackObject=nullptr;
-            return;
-          }
-        }
-        SampleObjects++;
-    }
-}
-//COLLISION TEST WITH INANIMATE OBJECTS
-for(int i=0;i< InanimateObjectCount;i++)
-{
+        AttackDirection = AttackDirection.Normalize();
 
-    SampleDistance=((*SampleInanimateObjects)->BoundingBox->Centroid - BoundingBox->Centroid).Length();
-    if(SampleDistance < AttackDistance)
+    // COLLISION TEST WITH ITS OWN TEAM SO BUGGY DOES NOT ATTACK ITS TEAM PLAYER.MEANT TO BE USED FOR AIs ONLY
+    float SampleDistance;
+    GameMath::Vector3 SamplePoint;
+    if (ObjectType == 2)
     {
-      SamplePoint=BoundingBox->Centroid + (AttackDirection * SampleDistance);
-      if(CollisionDetection(&SamplePoint,(*SampleInanimateObjects)->BoundingBox)==true)
-      {
-        AttackObject=nullptr;
-        return;
-      }
+        for (GameObject* Enemy : GameObject::Enemies)
+        {
+            if (Enemy->Index == Index || Enemy->isAlive == false)
+                continue;
+
+            SampleDistance = (Enemy->BoundingBox->Centroid - BoundingBox->Centroid).Length();
+            if (SampleDistance < AttackDistance)
+            {
+                SamplePoint = BoundingBox->Centroid + (AttackDirection * SampleDistance);
+                if (CollisionDetection(&SamplePoint, Enemy->BoundingBox) == true)
+                {
+                    AttackObject = nullptr;
+                    return;
+                }
+            }
+        }
     }
-    SampleInanimateObjects++;
-}
-//UPDATE HEALTH OF THE OBJECT BEING ATTACKED
-AttackObject->Health=AttackObject->Health - WeaponDamageRate;
-if(AttackObject->Health <=0.0f)
-{
-  AttackObject->Destroy();
-  AttackObject=nullptr;
-}
-//UPDATE WEAPON QUANTITY OF THIS OBJECT THAT IS ATTACKING THE ATTACK OBJECT
-WeaponQuantity=WeaponQuantity - WeaponConsumptionRate;
-//GET THE CANNON OF THIS OBJECT TO POINT TOWARDS THE ATTACK OBJECT
-CannonMovement(AttackDirection);
-//INITIATE FIRING OF BULLETS FROM THIS OBJECT TOWARDS THE ATTACK OBJECT
-CannonFiring(AttackDistance);
+    //COLLISION TEST WITH INANIMATE OBJECTS
+    for (GameObject* Inanimate : GameObject::Inanimates)
+    {
+        SampleDistance = (Inanimate->BoundingBox->Centroid - BoundingBox->Centroid).Length();
+        if (SampleDistance < AttackDistance)
+        {
+            SamplePoint = BoundingBox->Centroid + (AttackDirection * SampleDistance);
+            if (CollisionDetection(&SamplePoint, Inanimate->BoundingBox) == true)
+            {
+                AttackObject = nullptr;
+                return;
+            }
+        }
+    }
+
+    //GET THE CANNON OF THIS OBJECT TO POINT TOWARDS THE ATTACK OBJECT
+    CannonMovement(AttackDirection);
+
+    //INITIATE FIRING OF BULLETS FROM THIS OBJECT TOWARDS THE ATTACK OBJECT
+    CannonFiring(AttackDistance);
+
+    //UPDATE HEALTH OF THE OBJECT BEING ATTACKED AND 
+    //UPDATE WEAPON QUANTITY OF THIS OBJECT THAT IS ATTACKING THE ATTACK OBJECT
+    if (ObjectType == 1)
+    {
+        AttackObject->Health -= GameSettings::PlayerWeaponDamageRate;
+        WeaponQuantity -= GameSettings::PlayerWeaponConsumptionRate;
+    }
+    else if (ObjectType == 2)
+    {
+        AttackObject->Health -= GameSettings::EnemyWeaponDamageRate;
+        WeaponQuantity -= GameSettings::EnemyWeaponConsumptionRate;
+    }
+
+    //CHECK IF THE ENEMY HAS BEEN DESTROYED
+    if (AttackObject->Health <= 0.0f)
+    {
+        if (AttackObject != nullptr)
+            AttackObject->Destroy();
+        AttackObject = nullptr;
+    }
 }
 
 /*************************************************
@@ -416,127 +863,123 @@ THE PROCEDURE FOLLOWED HERE IS AS FOLLOWS:
       GET THE BUGGY TO MOVE TOWARDS THAT CLOSEST NEIGHBOUR BY THE FLOATING POINT DISTANCE CALCULATED ABOVE
       THIS INDICATES THAT THE CLOSEST NEIGHBOUR IS FAR AWAY AND THE OBJECT IS IN THE MIDDLE OF REACHING THE CLOSEST NEIGHBOUR
 *************************************************/
-void GameObject::WorldMovement(int Time_Per_Frame,GameWorldCube** HealthCube,GameWorldCube** WeaponCube)
+void GameObject::WorldMovement(int Time_Per_Frame)
 {
-if(DestinationWorldCube==nullptr)
-return;
-
-if(SourceWorldCube->Index==DestinationWorldCube->Index)
+//DESTINATION FOR THE OBJECT HAS NOT BEEN SET YET
+if (DestinationWorldCube == nullptr || SourceWorldCube == nullptr)
 {
-    VisitedWorldCubes.clear();
+    return;
+}
+//IN FOLLOWING CASES STOP THE PURSUIT
+//  THE OBJECT HAS REACHED THE DESTINATION WHICH IS WHY THE SOURCEWORLDCUBE IS THE SAME AS THE DESTINATIONWORLDCUBE 
+//  THE DESTINATION GOT OCCUPIED BY SOMEONE ELSE 
+//  A HALT FLAG HAS BEEN RASIED 
+else if (SourceWorldCube->Index == DestinationWorldCube->Index || DestinationWorldCube->Object != nullptr || HALT == true)
+{
+    DestinationWorldCube = nullptr;
+    HALT = (HALT ? false : false);//RESET THE HALT FLAG
     return;
 }
 else
 {
     std::vector<int>::iterator WorldCubeFinder;
-    GameWorldCube* ClosestNeighbour=nullptr;
-    float Distance=0.0f;
-    float LeastDistance=100000000.0f;
-    for(int i=0;i<8;i++)
-    {
-      //CHECK IF NEIGHBOUR EXISTS OR NOT
-      if(SourceWorldCube->Neighbours[i]!=nullptr)
-      {
-	WorldCubeFinder= std::find(VisitedWorldCubes.begin(), VisitedWorldCubes.end(),SourceWorldCube->Neighbours[i]->Index);
-	//CHECK IF THE NEIGHBOUR HAS BEEN VISITED BEFORE
-	if(WorldCubeFinder==VisitedWorldCubes.end())
-	{
-	  //IF THE NEIGHBOUR WORLD CUBE TURNS OUT TO BE THE DESTINATION WORLD CUBE
-	  //THEN THE OBJECT WILL MOVE TO THIS NEIGHBOUR AS LONG AS ITS NOT OCCUPIED
-	  //AND IN THE NEXT ITERATION THE DESTINATION CUBE WILL BE SET TO NULLPTR
-	  //IF NEIGHBOUR IS NOT OCCUPIED THEN PROCEED ELSE ADD IT TO THE LIST OF VISITED CUBES
-	  if(SourceWorldCube->Neighbours[i]->Object==nullptr)
-	  {
-	      Distance=(DestinationWorldCube->Centroid - SourceWorldCube->Neighbours[i]->Centroid).Length();
-	      if(Distance < LeastDistance)
-	      {
-		LeastDistance=Distance;
-		ClosestNeighbour=SourceWorldCube->Neighbours[i];
-	      }
-	  }
-	  else//IF NEIGHBOUR IS OCCUPIED THEN ADD IT TO THE LIST OF VISITED CUBES
-	  VisitedWorldCubes.push_back(SourceWorldCube->Neighbours[i]->Index);
-	}
-      }
-    }
-
+    GameWorldCube* ClosestNeighbour = GameObject::FindClosestEmptyNeighbour(SourceWorldCube, DestinationWorldCube);
     //IF NO NEIGHTBOUR TO MOVE TO IS FOUND THEN THE OBJECT IS STUCK
     //SET DESTINATION CUBE TO NULLPTR AND RESET PURSUIT
     if(ClosestNeighbour==nullptr)
     {
         DestinationWorldCube=nullptr;
-        VisitedWorldCubes.clear();
         return;
     }
     else if(ClosestNeighbour!=nullptr)
     {
         //HERE WE NEED TO FIND THE DISTANCE IN FLOATING VALUE THE OBJECT NEEDS TO TRAVEL IN THE NEXT ONE FRAME
-	//
-	//BASED ON THE OBJECT'S SPEED IN METER PER SECOND AND THE CURRENT FRAME RATE
-	//1) COVERT THE SPEED OF THE OBJECT FROM METER PER SECOND TO CENTIMETER PER SECOND BY MULTIPYING IT WITH 100.0
-	//2) ON THE SCREEN USING A RULER WE FOUND OUT THAT A FLOATING VALUE OF 0.16 EQUALS TO 1 CM OF MOVEMENT ON THE SCREEN
-	//3) MULTIPLYING THE CURRENT SPEED IN CENTIMETE PER SECOND WITH 0.16 GIVES US THE SPEED IN FLOATING VALUE PER SECOND
-	//   HERE THE SPEED CONSTANT = 100 * 0.16 WHICH IS WHEN MULTIPLIED WITH SPEED IN METERS PER SECOND
+	    //
+	    //BASED ON THE OBJECT'S SPEED IN METER PER SECOND AND THE CURRENT FRAME RATE
+	    //1) COVERT THE SPEED OF THE OBJECT FROM METER PER SECOND TO CENTIMETER PER SECOND BY MULTIPYING IT WITH 100.0
+	    //2) ON THE SCREEN USING A RULER WE FOUND OUT THAT A FLOATING VALUE OF 0.16 EQUALS TO 1 CM OF MOVEMENT ON THE SCREEN
+	    //3) MULTIPLYING THE CURRENT SPEED IN CENTIMETE PER SECOND WITH 0.16 GIVES US THE SPEED IN FLOATING VALUE PER SECOND
+	    //   HERE THE SPEED CONSTANT = 100 * 0.16 WHICH IS WHEN MULTIPLIED WITH SPEED IN METERS PER SECOND
         //   GIVES OUR SPEED IN FLOATING POINT PER SECOND AND THEN DIVIDING BY 1000 GIVES US THE SPEED IN
-	//   FLOATING VALUE PER MILISECOND
-	//4) DISTANCE = SPEED X TIME
-	//            = FLOATING VALUE PER SECOND X TIME TAKEN BY ONE FRAME IN MILISECONDS
+	    //   FLOATING VALUE PER MILISECOND
+	    //4) DISTANCE = SPEED X TIME
+	    //            = FLOATING VALUE PER SECOND X TIME TAKEN BY ONE FRAME IN MILISECONDS
         //            = DISTANCE NEEDED TO BE TRAVELLED IN ONE FRAME IN FLOATING VALUES
-	float FrameDistance=(Speed * SpeedConstant) * Time_Per_Frame;
+        //
+        //   WARNING !! : MIGHT CAUSE AN ERROR.
+        //   WHEN A SOURCE AND DESTINATION ARE SET THEN DURING THE MOVEMENT FROM SOURCE TO DESTINATION, THE OBJECT ONLY 
+        //   CHANGES/UPDATES ITS SOURCE WORLDCUBE TO THE NEXT NEIGHTBOURING CUBE WHEN THE DISTANCE BETWEEN THEM IS ZERO(FLOAT)
+        //   HOWEVER IF A BUGGY MOVEMENT HAPPENS WITH THAT ZERO DISTANCE THEN THAT WILL CAUSE THE DIRECTION TO BE NAN ALONG 
+        //   WITH THE OBJECT BUGGYMATRIX WHICH WILL CAUSE THE OBJECT TO DISAPPEAR. ALWAYS MAKE SURE THAT THE ACTUAL DISTANCE 
+        //   IS NOT ZERO BEFORE DOING A BUGGY MOVEMENT ON IT
+        float FrameDistance=(Speed * SpeedConstant) * Time_Per_Frame;
         GameMath::Vector3 Direction;
+        float ActualDistance = 0.0f;
         Direction.x=ClosestNeighbour->Centroid.x - BoundingBox->Centroid.x;
         Direction.z=ClosestNeighbour->Centroid.z - BoundingBox->Centroid.z;
         Direction.y=0.0f;
-        float ActualDistance=Direction.Length();
-        Direction=Direction.Normalize();
-
+        ActualDistance=Direction.Length();
         //THIS INDICATES THAT THE OBJECT HAS REACHED THE CLOSEST NEIGHBOUR AND
         //WILL LEAVE ITS CURRENT SOURCE WORLD CUBE AND OCCUPY THE CLOSEST NEIGHBOUR WORLD CUBE
         if(ActualDistance < FrameDistance)
         {
-          BuggyMovement(&Direction,ActualDistance);
-          VisitedWorldCubes.push_back(SourceWorldCube->Index);
-          SourceWorldCube->Object=nullptr;
-          ClosestNeighbour->Object=this;
-          SourceWorldCube=ClosestNeighbour;
-
-          //IF THE CLOSEST NEIGHBOUR CONTAINS A HEALTH OBJECT THEN UPDATE THE HEALTH OF THE
-          //OBJECT ACCORDINGLY
-          if(ClosestNeighbour->HealthObject!=nullptr)
-	  {
-	      Health+= HealthRestorationRate;
-	      if(Health > 100.0f)
-	      Health=100.0f;
-
-	      ClosestNeighbour->HealthObject->isAlive=false;
-	      ClosestNeighbour->HealthObject=nullptr;
-	      (*HealthCube)=nullptr;
-	  }
-          //IF THE CLOSEST NEIGHBOUR CONTAINS A WEAPON OBJECT THEN UPDATE THE WEAPON OF THE
-          //OBJECT ACCORDINGLY
-          if(ClosestNeighbour->WeaponObject!=nullptr)
-	  {
-	      WeaponQuantity+= WeaponRestorationRate;
-	      if(WeaponQuantity > 100.0f)
-	      WeaponQuantity=100.0f;
-
-	      ClosestNeighbour->WeaponObject->isAlive=false;
-	      ClosestNeighbour->WeaponObject=nullptr;
-	      (*WeaponCube)=nullptr;
-	  }
-          //IF HALT FLAG IS RAISED THEN STOP PURSUING OR MOVING TOWARDS THE DESTINATION WORLD CUBE
-          if(HALT==true)
-          {
-              DestinationWorldCube=nullptr;
-              VisitedWorldCubes.clear();
-              HALT=false;
-          }
+            if (ActualDistance > 0.000000000000000f)
+            {
+                Direction = Direction.Normalize();
+                BuggyMovement(&Direction, ActualDistance);
+            }
+            SourceWorldCube->Object=nullptr;
+            ClosestNeighbour->Object=this;
+            SourceWorldCube=ClosestNeighbour;
+            //IF THE CLOSEST NEIGHBOUR CONTAINS A HEALTH OBJECT THEN UPDATE THE HEALTH OF THE
+            //OBJECT ACCORDINGLY
+            //IF THE CLOSEST NEIGHBOUR CONTAINS A WEAPON OBJECT THEN UPDATE THE WEAPON OF THE
+            //OBJECT ACCORDINGLY
+            if(ClosestNeighbour->HealthObject!=nullptr)
+	        {
+                if (ObjectType == 1)
+                {
+                    Health += GameSettings::PlayerHealthRestorationRate;
+                    if (Health > 100.0f)
+                        Health = 100.0f;
+                }
+                else if (ObjectType == 2)
+                {
+                    Health += GameSettings::EnemyHealthRestorationRate;
+                    if (Health > 100.0f)
+                        Health = 100.0f;
+                }
+                ClosestNeighbour->HealthObject->isAlive=false;
+                ClosestNeighbour->HealthObject = nullptr;
+	        }
+            else if(ClosestNeighbour->WeaponObject!=nullptr)
+	        {
+                if (ObjectType == 1)
+                {
+                    WeaponQuantity += GameSettings::PlayerWeaponRestorationRate;
+                    if (WeaponQuantity > 100.0f)
+                        WeaponQuantity = 100.0f;
+                }
+                else if (ObjectType == 2)
+                {
+                    WeaponQuantity += GameSettings::EnemyWeaponRestorationRate;
+                    if (WeaponQuantity > 100.0f)
+                        WeaponQuantity = 100.0f;
+                }
+                ClosestNeighbour->WeaponObject->isAlive=false;
+	            ClosestNeighbour->WeaponObject=nullptr;
+	        }
         }
         else
-        BuggyMovement(&Direction,FrameDistance);
+        {
+            Direction = Direction.Normalize();
+            BuggyMovement(&Direction, FrameDistance);
+        }
     }
 }
+
 }
+
 /*************************************************
 THIS FUNCTION MOVES THE BUGGY BY THE DISTANCE SPECIFIED IN THE DIRECTION SPECIFIED
 AND IT ALSO ROTATES THE WHEELS AROUND THEIR CENTER GIVING THE ILLUSION OF WHEELS MOVING
@@ -612,35 +1055,19 @@ void GameObject::BuggyMovement(GameMath::Vector3* Direction,float Distance)
 {
 if(Armature.Bones.size() > 0 && Direction!=nullptr)
 {
-    if(WheelRotationAngle>360.0f)
-    WheelRotationAngle=0.0f;
-    else
-    WheelRotationAngle+=10.0f;
-
-    GameMath::Matrix4x4 RM;
-    GameMath::Matrix4x4 pTM=GameMath::Transform::Translate(Armature.Bones["FrontWheel"]->Head);
-    GameMath::Matrix4x4 nTM=GameMath::Transform::Translate(-Armature.Bones["FrontWheel"]->Head);
-    RM=pTM * GameMath::Transform::RotateQ(-ZAxis,WheelRotationAngle) * nTM;
-    SetBoneMatrix("FrontWheel",RM);
-
-    pTM=GameMath::Transform::Translate(Armature.Bones["BackWheel"]->Head);
-    nTM=GameMath::Transform::Translate(-Armature.Bones["BackWheel"]->Head);
-    RM=pTM * GameMath::Transform::RotateQ(-ZAxis,WheelRotationAngle) * nTM;
-    SetBoneMatrix("BackWheel",RM);
-
+    WheelRotation();
     BuggyTranslationMatrix=GameMath::Transform::Translate((*Direction) * Distance) * BuggyTranslationMatrix;
     BoundingBox->Centroid.x=BuggyTranslationMatrix.Matrix[3][0];
     BoundingBox->Centroid.y=BuggyTranslationMatrix.Matrix[3][1];
     BoundingBox->Centroid.z=BuggyTranslationMatrix.Matrix[3][2];
-    BoundingBox->CalculateXYZ();
-
+   
     float DiffInAngles=atan2(Direction->x,Direction->z) - atan2(BuggyFront.x,BuggyFront.z);
     if(abs(DiffInAngles) > 0.1f)
     {
-	BuggyRotationAngle=DiffInAngles * 180.0f/PI;
-	BuggyRotationAngle=(BuggyRotationAngle * 30.0f) /100.0f;
-	GameMath::Matrix4x4 Rot=GameMath::Transform::RotateQ(YAxis,BuggyRotationAngle);
-	BuggyFront=Rot * BuggyFront;
+	    BuggyRotationAngle=DiffInAngles * 180.0f/PI;
+	    BuggyRotationAngle=(BuggyRotationAngle * 30.0f) /100.0f;
+	    GameMath::Matrix4x4 Rot=GameMath::Transform::RotateQ(YAxis,BuggyRotationAngle);
+	    BuggyFront=Rot * BuggyFront;
         CannonFront=Rot * CannonFront;
         BuggyRotationMatrix=Rot * BuggyRotationMatrix;
         _Bullet->CannonFront=CannonFront;
@@ -648,6 +1075,8 @@ if(Armature.Bones.size() > 0 && Direction!=nullptr)
     }
 
     BuggyFinalMatrix=BuggyTranslationMatrix * BuggyRotationMatrix;
+    BoundingBox->FinalMatrix = BuggyFinalMatrix;
+    BoundingBox->CalculateXYZ();
     _Bullet->CannonPosition=BuggyFinalMatrix * Armature.Bones["MachineGun"]->Head;
     _Explosion->BBCentroid=BoundingBox->Centroid;
     _Explosion->BBCentroid.y=0.0f;
@@ -705,6 +1134,7 @@ if(abs(DiffInAngles) > 0.1f)
     SetBoneMatrix("MachineGun",pTM  * CannonRotationMatrix * nTM);
 }
 }
+
 /*************************************************
 THIS FUNCTION ROTATES THE MACHINE GUN ABOUT THE WORLD X AXIS SO IT LOOKS LIKE AS IF IT ROTATING ABOUT ITS CENTER
 
@@ -730,9 +1160,8 @@ void GameObject::CannonFiring(float AttackDistance)
 {
 if(CannonFireRotationAngle>360.0f)
   CannonFireRotationAngle=0.0f;
-else
-  CannonFireRotationAngle+=30.0f;
-
+CannonFireRotationAngle += 30.0f;
+CannonFireRotationAngle = (float)((int)CannonFireRotationAngle % 360);
 GameMath::Matrix4x4 pTM=GameMath::Transform::Translate(Armature.Bones["MachineGun"]->Head);
 GameMath::Matrix4x4 nTM=GameMath::Transform::Translate(-Armature.Bones["MachineGun"]->Head);
 SetBoneMatrix("MachineGunRoller",pTM * GameMath::Transform::RotateQ(XAxis,CannonFireRotationAngle) * nTM);
@@ -745,6 +1174,7 @@ _Bullet->DistanceRate=_Bullet->DistanceRate + 25.0f;
 _Bullet->TranslationMatrix=GameMath::Transform::Translate(_Bullet->CannonFront  * ((AttackDistance * _Bullet->DistanceRate)/100.0f));
 _Bullet->isAlive=true;
 }
+
 /*************************************************
 THIS FUNCTION UPDATES THE BUGGY'S FINAL MATRIX INTO THE MAIN VERTEX SHADER
 ALONG WITH:

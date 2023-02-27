@@ -1,4 +1,23 @@
 #include <GameText/GameText.h>
+int GameText::GameTextIndex = 0;
+GameText::~GameText()
+{
+    if (HealthVBO >= 0)
+        glDeleteBuffers(1, &HealthVBO);
+    if (HealthVAO >= 0)
+        glDeleteVertexArrays(1, &HealthVAO);
+    if (WeaponVBO >= 0)
+        glDeleteBuffers(1, &WeaponVBO);
+    if (WeaponVAO >= 0)
+        glDeleteVertexArrays(1, &WeaponVAO);
+    if (VBO >= 0)
+        glDeleteBuffers(1, &VBO);
+    if (VAO >= 0)
+        glDeleteVertexArrays(1, &VAO);
+    if (Texture >= 0)
+        glDeleteTextures(1, &Texture);
+    std::cout << "GAMETEXT #"<<std::to_string(Index)<<" FROM OBJECT #"<<std::to_string(ObjectIndex)<<" GOT DESTROYED\n";
+}
 /*************************************************
 EVERY MOVABLE GAME OBJECT GETS A INFO PANEL THAT DISPLAYS THAT
 OBJECT'S HEALTH STATUS AND WEAPON STATUS AND THE INFO PANEL IS ALWAYS FACING TOWARDS THE CAMERA
@@ -27,8 +46,11 @@ THE PROCEDURE FOLLOWED HERE IS:
    CAMERA OR THE INFOPANEL DOES NOT ROTATE AT ALL BASED ON THE CAMERA'S PERSPECTIVE AND THE TRANSLATION MATRIX BASED ON OBJECT'S
    BOUNDING BOX CENTROD VECTOR MAKES SURE THAT THE INFO PANEL ALWAYS MOVES ALONG WITH THE OBJECT AND STAYS ON TOP ON THE OBJECT AT A FIXED HEIGHT
 *************************************************/
-GameText::GameText(std::string BMPLocation,GameCamera::FPS *Camera)
+GameText::GameText(std::string BMPLocation,GameCamera::FPS *Camera,int ObjectIndex)
 {
+Index = GameText::GameTextIndex++;
+this->ObjectIndex = ObjectIndex;
+
 this->Camera=Camera;
 float vertices[]=
 {

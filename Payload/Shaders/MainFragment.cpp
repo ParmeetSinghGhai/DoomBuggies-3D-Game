@@ -89,10 +89,9 @@ layout(std430, binding = LightData_Binding) buffer LightData
 vec3 CalculateAmbientLight(vec3 LightColor,Material material);
 vec3 CalculateDiffuseLight(vec3 LightColor,vec3 LightDirection,Material material);
 vec3 CalculateSpecularLight(vec3 LightColor,vec3 LightDirection,vec3 ViewerDirection,Material material);
-vec4 CalculateAllLights(Material material);
 vec3 GetLightDirection(vec4 LightDirection);
 vec3 GetViewerDirection();
-
+vec4 CalculateAllLights(Material material);
 
 void main()
 {
@@ -100,12 +99,17 @@ Material material;
 //if no material is provided for a primitive / triangle then a default primitive is created
 //the uniform variable "NoMaterialFlag" has a value of -1 if the primitive has not been
 //assigned any material
-if(NoMaterialFlag==-1)
-material=Material(1.0f,32,0,0,0,0,0,0,vec4(0.5f,0.5f,0.5f,0.0f),vec4(0.5f,0.5f,0.5f,0.0f));
+
+//NoMaterialFlag , value = 1(true) object has no material, value = 0(false) object has material
+
+if (NoMaterialFlag == 1)
+material = Material(1.0f, 32, 0, 0, 0, 0, 0, 0, vec4(0.5f, 0.5f, 0.5f, 0.0f), vec4(0.5f, 0.5f, 0.5f, 0.0f));
 else
-material=Materials[FMaterialIndex];
-FragColor=CalculateAllLights(material);
+material = Materials[FMaterialIndex];
+
+FragColor = CalculateAllLights(material);
 };
+
 
 /*
 this function calculates the ambient light for an object based on the light source's color and the material of the object
@@ -259,6 +263,7 @@ vec4 CalculateAllLights(Material material)
 {
   vec3 ViewerDirection=GetViewerDirection();
   vec3 AllLights=vec3(0.0f,0.0f,0.0f);
+    
   for(int i=0;i<TotalLights;i++)
   {
      if(Lights[i].LightType==0)
@@ -280,6 +285,7 @@ vec4 CalculateAllLights(Material material)
      {
         vec3 LightDirection=GetLightDirection(Lights[i].Position);
         vec3 Color=vec3(Lights[i].Color);
+
         float distance = length(vec3(Lights[i].Position) - vec3(FFragmentPosition));
         float attenuation = 1.0f / (Lights[i].Constant + Lights[i].Linear * distance + Lights[i].Quadratic * (distance * distance));
 
@@ -289,8 +295,10 @@ vec4 CalculateAllLights(Material material)
 
         AllLights+=(attenuation * intensity * CalculateDiffuseLight(Color,LightDirection,material)) + (attenuation * intensity * CalculateSpecularLight(Color,LightDirection,ViewerDirection,material));
      }
+     
   }
-return vec4(AllLights,1.0f);
+  
+  return vec4(AllLights,1.0f);
 }
 
 

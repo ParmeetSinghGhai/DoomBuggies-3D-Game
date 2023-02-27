@@ -10,11 +10,15 @@ class GameArmature
 {
 public:
 static int BoneIndex;
+static int ArmatureIndex;
+int Index;
+int ObjectIndex;
 
 struct Bone
 {
 public:
 int Index;
+int ArmatureIndex;
 std::string Name;
 GameMath::Vector3 Head;
 GameMath::Vector3 Tail;
@@ -23,12 +27,14 @@ GameMath::Vector3 YAxis;
 GameMath::Vector3 ZAxis;
 std::pair<std::string,Bone*> Parent;
 std::map<std::string,Bone*> Child;
-Bone();
+Bone(int ArmatureIndex);
+~Bone();
 };
 
 std::string Name;
 std::map<std::string,Bone*> Bones;
 
+~GameArmature();
 void ConnectBones();
 void ShowContent();
 };

@@ -1,5 +1,13 @@
 #include <GameBoundingBox/GameBoundingBox.h>
 int GameBoundingBox::BoundingBoxIndex=0;
+GameBoundingBox::~GameBoundingBox()
+{
+    if (VBO >= 0)
+        glDeleteBuffers(1, &VBO);
+    if (VAO >= 0)
+        glDeleteVertexArrays(1, &VAO);
+    std::cout << "GAMEBOUNDINGBOX #" << std::to_string(Index) << " FROM OBJECT #"<<std::to_string(ObjectIndex)<<" GOT DESTROYED\n";
+}
 /*************************************************
 A BOUNDING BOX IS A CUBE THAT SURROUNDS AN OBJECT WHICH MOVES ALONG WITH THE OBJECT
 AND HELPS WITH COLLISION DETECTION BETWEEN THIS OBJECT AND OTHER OBJECTS THAT ALSO HAVE THEIR OWN
@@ -25,9 +33,11 @@ THE DEFAULT CONSTRUCTORS:
 
 BOUDING BOXED ARE ONLY TRANSLATED AND NOT ROTATED OR SCALED
 *************************************************/
-GameBoundingBox::GameBoundingBox(float maxx,float minx,float maxy,float miny,float maxz,float minz)
+GameBoundingBox::GameBoundingBox(float maxx,float minx,float maxy,float miny,float maxz,float minz,int ObjectIndex)
 {
 Index=BoundingBoxIndex++;
+this->ObjectIndex = ObjectIndex;
+
 glGenVertexArrays(1, &VAO);
 glGenBuffers(1, &VBO);
 
@@ -156,6 +166,7 @@ IN THE BACKGROUND FRAMEBUFFER
 *************************************************/
 void GameBoundingBox::DrawBackground()
 {
+glUniformMatrix4fv(2, 1, GL_FALSE, FinalMatrix.Addressof());
 glUniform1i(5,0);
 glBindVertexArray(VAO);
 glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -178,6 +189,7 @@ ON THE BOUNDING BOX. THIS IS HOW ITS DONE
 void GameBoundingBox::DrawForeground()
 {
 glUniform1i(5,1);
+#if !DEBUG
 if(ColorSwitch==true)
 {
     ColorEffect=ColorEffect - 0.08f;
@@ -190,8 +202,13 @@ else if(ColorSwitch==false)
     if(ColorEffect > 1.0f)
     ColorSwitch=true;
 }
-
+#endif
+glUniformMatrix4fv(2, 1, GL_FALSE, FinalMatrix.Addressof());
+#if !DEBUG
 glUniform4f(6,ColorEffect + ColorTint.x,ColorEffect+ColorTint.y,ColorEffect+ColorTint.z,0.5f);
+#else
+glUniform4f(6, ColorTint.x, ColorTint.y, ColorTint.z, 1.0f);
+#endif
 glBindVertexArray(VAO);
 glDrawArrays(GL_TRIANGLES, 0, 36);
 }

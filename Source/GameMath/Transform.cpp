@@ -55,17 +55,17 @@ void GameMath::Transform::CopyMatrixtoArray(GameMath::Matrix4x4 *Mat,float *outp
 GameMath::Matrix4x4 GameMath::Transform::Scale(const GameMath::Vector3 &ScaleVector)
 {
 	GameMath::Matrix4x4 output;
-	output.Matrix[0][0] = ScaleVector.x;
-	output.Matrix[1][1] = ScaleVector.y;
-	output.Matrix[2][2] = ScaleVector.z;
+	output.Matrix[0][0] = float(ScaleVector.x);
+	output.Matrix[1][1] = float(ScaleVector.y);
+	output.Matrix[2][2] = float(ScaleVector.z);
 	return output;
 }
 GameMath::Matrix4x4 GameMath::Transform::Scale(const float &x,const float &y,const float &z)
 {
 	GameMath::Matrix4x4 output;
-	output.Matrix[0][0] = x;
-	output.Matrix[1][1] = y;
-	output.Matrix[2][2] = z;
+	output.Matrix[0][0] = float(x);
+	output.Matrix[1][1] = float(y);
+	output.Matrix[2][2] = float(z);
 	return output;
 }
 //*************************************************
@@ -81,17 +81,17 @@ GameMath::Matrix4x4 GameMath::Transform::Scale(const float &x,const float &y,con
 GameMath::Matrix4x4 GameMath::Transform::Translate(const GameMath::Vector3 &TranslateVector)
 {
 	GameMath::Matrix4x4 output;
-	output.Matrix[3][0] = TranslateVector.x;
-	output.Matrix[3][1] = TranslateVector.y;
-	output.Matrix[3][2] = TranslateVector.z;
+	output.Matrix[3][0] = float(TranslateVector.x);
+	output.Matrix[3][1] = float(TranslateVector.y);
+	output.Matrix[3][2] = float(TranslateVector.z);
 	return output;
 }
 GameMath::Matrix4x4 GameMath::Transform::Translate(const float &x,const float &y,const float &z)
 {
 	GameMath::Matrix4x4 output;
-	output.Matrix[3][0] = x;
-	output.Matrix[3][1] = y;
-	output.Matrix[3][2] = z;
+	output.Matrix[3][0] = float(x);
+	output.Matrix[3][1] = float(y);
+	output.Matrix[3][2] = float(z);
 	return output;
 }
 /*************************************************
@@ -159,7 +159,7 @@ GameMath::Matrix4x4 GameMath::Transform::Rotate(const char &Axis, const float &A
 {
 	GameMath::Matrix4x4 output;
 	const float CosTheta = cos(GameMath::Transform::GetRadian(AngleOfRotationinDegrees));
-        const float SinTheta=sin(GameMath::Transform::GetRadian(AngleOfRotationinDegrees));
+    const float SinTheta=sin(GameMath::Transform::GetRadian(AngleOfRotationinDegrees));
 
 	if (Axis == 'x' || Axis == 'X')
 	{

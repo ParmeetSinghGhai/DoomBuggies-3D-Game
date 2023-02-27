@@ -9,8 +9,9 @@ class GameBoundingBox
 {
 public:
 static int BoundingBoxIndex;
-
 int Index;
+int ObjectIndex;
+
 float R=0.0f;
 float G=0.0f;
 float B=0.0f;
@@ -36,10 +37,11 @@ float ColorEffect=1.0;
 bool ColorSwitch=true;
 GameMath::Vector3 Centroid;
 GameMath::Vector3 ColorTint;
+GameMath::Matrix4x4 FinalMatrix;
 GameObject* Object=nullptr;
 
-
-GameBoundingBox(float maxx,float minx,float maxy,float miny,float maxz,float minz);
+~GameBoundingBox();
+GameBoundingBox(float maxx,float minx,float maxy,float miny,float maxz,float minz,int ObjectIndex);
 void CalculateXYZ();
 void Load();
 void DrawBackground();

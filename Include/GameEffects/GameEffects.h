@@ -12,12 +12,17 @@
 #include <GameBMP/GameBMP.h>
 #include <GameMath/GameMath.h>
 #include <GameCamera/GameCamera.h>
+#include <GameSettings/GameSettings.h>
 class GameEffects
 {
 public:
 class Bullet
 {
 public:
+static int BulletIndex;
+int Index;
+int ObjectIndex;
+
 float* Vertices;
 int TriangleCount;
 int VertexCount;
@@ -31,7 +36,10 @@ GameMath::Matrix4x4 RotationMatrix;
 bool isAlive=false;
 
 unsigned int VAO;
+unsigned int VBO;
 unsigned int Texture;
+Bullet(int ObjectIndex);
+~Bullet();
 void Load();
 GameMath::Matrix4x4 Draw();
 };
@@ -42,6 +50,10 @@ GameMath::Matrix4x4 Draw();
 class BulletFire
 {
 public:
+static int BulletFireIndex;
+int Index;
+int ObjectIndex;
+
 float* Vertices;
 int TriangleCount;
 int VertexCount;
@@ -51,7 +63,10 @@ float BulletFireRate=0.1f;
 float BulletFireRotationRate=5.0f;
 
 unsigned int VAO;
+unsigned int VBO;
 unsigned int Texture;
+BulletFire(int ObjectIndex);
+~BulletFire();
 void Load();
 void Draw(GameMath::Matrix4x4 BulletMatrix);
 };
@@ -62,6 +77,10 @@ void Draw(GameMath::Matrix4x4 BulletMatrix);
 class Explosion
 {
 public:
+static int ExplosionIndex;
+int Index;
+int ObjectIndex;
+
 float* Vertices;
 int TriangleCount;
 int VertexCount;
@@ -73,7 +92,10 @@ bool isCameraShaking=false;
 bool CameraSwitch=false;
 
 unsigned int VAO;
+unsigned int VBO;
 unsigned int Texture;
+Explosion(int ObjectIndex);
+~Explosion();
 void Load();
 void Draw(GameCamera::FPS *Camera,bool* isCameraShaking_GlobalFlag);
 };
@@ -84,12 +106,16 @@ class HelpSection
 {
 public:
 float* Vertices;
-int TriangleCount;
-int VertexCount;
-std::string TextureLocation;
+int TriangleCount=0;
+int VertexCount=0;
+int State = 0;
 
+std::string TextureLocations[9];
+unsigned int Texture[9];
 unsigned int VAO;
-unsigned int Texture;
+unsigned int VBO;
+
+~HelpSection();
 void Load();
 void Draw();
 };

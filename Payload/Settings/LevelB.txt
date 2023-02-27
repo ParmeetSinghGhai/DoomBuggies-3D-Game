@@ -1,0 +1,55 @@
+***Player Settings***
+PlayerCount=4
+PlayerSpeed=10.1f
+PlayerWeaponDamageRate=20.05f
+PlayerWeaponConsumptionRate=0.1f
+PlayerWeaponRange=10.0f
+PlayerWeaponRestorationRate=20.0f
+PlayerHealthRestorationRate=20.0f
+***Enemy Settings***
+EnemyCount=4
+EnemySpeedMax=0.1f
+EnemySpeedMin=0.1f
+EnemySpeedIncreaseInterval=2000
+EnemySpeedIncreaseRate=1.0f
+EnemyHealthBeforeReload=30.0f
+EnemyWeaponBeforeReload=30.0f
+EnemyWeaponDamageRate=0.01f
+EnemyWeaponConsumptionRate=0.1f
+EnemyWeaponRange=10.f
+EnemyWeaponRestorationRate=20.0f
+EnemyHealthRestorationRate=20.0f
+HealthAndWeaponSpawnTime=5000
+***Objects For Hiding***
+InanimateCount=30
+***LightSettings***
+LampCount=10
+LampLightOnTime=20000
+LampLightOffTime=10000
+LampLightMax=0.9f
+LampLightMin=0.1f
+LampLightChangeSpeed=0.001f
+SunLightColorRed=0.0f
+SunLightColorGreen=0.8f
+SunLightColorBlue=0.0f
+***Select Color Settings***
+PlayerSelectColorRed=0.0f
+PlayerSelectColorGreen=0.0f
+PlayerSelectColorBlue=0.8f
+EnemySelectColorRed=0.8f
+EnemySelectColorGreen=0.0f
+EnemySelectColorBlue=0.0f
+HealthSelectColorRed=0.0f
+HealthSelectColorGreen=0.8f
+HealthSelectColorBlue=0.0f
+WeaponSelectColorRed=0.0f
+WeaponSelectColorGreen=0.8f
+WeaponSelectColorBlue=0.0f
+LocationSelectColorRed=0.8f
+LocationSelectColorGreen=0.8f
+LocationSelectColorBlue=0.0f
+***Keyboard and Mouse Sensitivity***
+CameraKeyBoardSensitivity=0.3f
+CameraMouseSensitivity=0.2f
+***Explosion Settings***
+ExplosionRate=0.1f

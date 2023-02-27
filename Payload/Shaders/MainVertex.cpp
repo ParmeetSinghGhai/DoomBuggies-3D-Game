@@ -220,7 +220,7 @@ void main()
  //Projection * View * Model Matrix(Translate,Rotate,Scale) * Bone Matrix(Translate,Rotate,Scale)
 
  VFragmentPosition=Model * CalCulateBoneMatrix();
- gl_Position= Projection * View * VFragmentPosition;
+ gl_Position = Projection * View * VFragmentPosition;
 
  VMaterialIndex=MaterialIndex;
  VTextureCoords=TextureCoords;

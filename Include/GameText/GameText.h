@@ -19,16 +19,17 @@ unsigned int HealthVBO;
 float HealthMeter=0.0f;
 GameMath::Vector3 HealthColor=GameMath::Vector3(0.0f,1.0f,0.0f);
 
-
 unsigned int WeaponVAO;
 unsigned int WeaponVBO;
 float WeaponMeter=0.0f;
 GameMath::Vector3 WeaponColor=GameMath::Vector3(0.0f,1.0f,0.0f);
 
-
 public:
-GameText(std::string BMPLocation,GameCamera::FPS *Camera);
-void Load();
+static int GameTextIndex;
+int Index;
+int ObjectIndex;
+~GameText();
+GameText(std::string BMPLocation,GameCamera::FPS *Camera,int ObjectIndex);
 void Draw();
 void Update(float Health,float Weapon,GameMath::Vector3* Location);
 };
